@@ -8,7 +8,7 @@ split is invalid here, the metric, the closed-day rule, and the exclusion of
 `Customers`. No model is fitted -- these are naive rules, and they exist to
 give any later model a number it has to beat.
 
-Renders `baseline_template.html` into `03_baseline_dashboard.html`.
+Renders `baseline_template.html` into `outputs/03_baseline_dashboard.html`.
 
     python3 build_baseline.py
 
@@ -29,7 +29,7 @@ import baselines as bl
 WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 TEMPLATE = "baseline_template.html"
-OUTPUT = "03_baseline_dashboard.html"
+OUTPUT = "outputs/03_baseline_dashboard.html"
 PLACEHOLDER = "/*__DATA__*/"
 
 
@@ -297,6 +297,9 @@ def main():
     template = open(args.template).read()
     if PLACEHOLDER not in template:
         raise SystemExit(f"{args.template} has no {PLACEHOLDER} placeholder")
+    out_dir = os.path.dirname(args.out)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
     payload = json.dumps(stats, separators=(",", ":"))
     open(args.out, "w").write(template.replace(PLACEHOLDER, payload))
 

@@ -2,7 +2,7 @@
 """Build the Stage 1 data audit dashboard.
 
 Profiles the raw CSVs and renders `audit_template.html` into
-`01_data_audit.html`, replacing the `/*__DATA__*/` placeholder with the
+`outputs/01_data_audit.html`, replacing the `/*__DATA__*/` placeholder with the
 profiled statistics as inline JSON.
 
 This script is the source of truth for the dashboard. Edit the template or
@@ -22,7 +22,7 @@ import os
 from datetime import date, timedelta
 
 TEMPLATE = "audit_template.html"
-OUTPUT = "01_data_audit.html"
+OUTPUT = "outputs/01_data_audit.html"
 PLACEHOLDER = "/*__DATA__*/"
 
 # Sales histogram: 40 bins spanning 0..HIST_MAX, with the top bin catching
@@ -188,6 +188,9 @@ def main():
     template = open(args.template).read()
     if PLACEHOLDER not in template:
         raise SystemExit(f"{args.template} has no {PLACEHOLDER} placeholder")
+    out_dir = os.path.dirname(args.out)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
     payload = json.dumps(stats, separators=(",", ":"))
     open(args.out, "w").write(template.replace(PLACEHOLDER, payload))
 

@@ -175,11 +175,17 @@ Regenerate the dashboard and re-check this section if the data changes.
 
 **Stage outputs**
 
-- `01_data_audit.html` — data audit. Built by `build_audit.py`.
-- `02_demand_patterns.html` — descriptive demand patterns. Built by
+All four dashboards are written to `outputs/`, with `outputs/README.md`
+documenting how to rerun them from the raw CSVs.
+
+- `outputs/01_data_audit.html` — data audit. Built by `build_audit.py`.
+- `outputs/02_demand_patterns.html` — descriptive demand patterns. Built by
   `build_patterns.py`.
-- `03_baseline_dashboard.html` — validation design and naive baselines. Built
-  by `build_baseline.py` on top of `baselines.py`.
+- `outputs/03_baseline_dashboard.html` — validation design and naive baselines.
+  Built by `build_baseline.py` on top of `baselines.py`.
+- `outputs/04_forecast_review.html` — the forecast against that benchmark.
+  Built by `build_forecast.py` on top of `forecast.py`.
+- `python3 outputs/rebuild_all.py` rebuilds all four in order.
 - The HTML files are generated output. Edit the templates or the build scripts
   and re-run; never hand-edit the rendered HTML.
 
@@ -279,7 +285,7 @@ as the baselines above.
 - **42.6% lower MAE than the benchmark**, and better at 852 of the 856 stores.
 - Model: each store's weekday average scaled by promotion (per store),
   school holiday, day of month, month, and the store's recent level. Built by
-  `build_forecast.py` on top of `forecast.py`; output `04_forecast_review.html`.
+  `build_forecast.py` on top of `forecast.py`; output `outputs/04_forecast_review.html`.
 - Every input is knowable at forecast time. **`Customers` is excluded by
   construction** — `prepare_features()` never carries it.
 - Feature selection ran on an inner window (2015-04-27 to 2015-06-13) with the

@@ -4,7 +4,7 @@
 Fits the multiplicative forecast in `forecast.py` on history before the
 approved cutoff, scores it against the Stage 4 benchmark on the same holdout
 with the same code path, and renders `forecast_template.html` into
-`04_forecast_review.html`.
+`outputs/04_forecast_review.html`.
 
     python3 build_forecast.py
 
@@ -24,7 +24,7 @@ import baselines as bl
 from forecast import MultiplicativeForecast, prepare_features
 
 TEMPLATE = "forecast_template.html"
-OUTPUT = "04_forecast_review.html"
+OUTPUT = "outputs/04_forecast_review.html"
 PLACEHOLDER = "/*__DATA__*/"
 
 CUTOFF = "2015-06-14"
@@ -285,6 +285,9 @@ def main():
     template = open(args.template).read()
     if PLACEHOLDER not in template:
         raise SystemExit(f"{args.template} has no {PLACEHOLDER} placeholder")
+    out_dir = os.path.dirname(args.out)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
     payload = json.dumps(stats, separators=(",", ":"), default=float)
     open(args.out, "w").write(template.replace(PLACEHOLDER, payload))
 

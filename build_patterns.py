@@ -2,7 +2,7 @@
 """Build the Stage 2 demand patterns dashboard.
 
 Aggregates `train.csv` (joined to `store.csv`) into the demand summaries shown
-in `02_demand_patterns.html`, rendering `patterns_template.html` with the
+in `outputs/02_demand_patterns.html`, rendering `patterns_template.html` with the
 figures inlined as JSON.
 
 This script is the source of truth for that dashboard. Edit the template or
@@ -23,7 +23,7 @@ import os
 from datetime import date
 
 TEMPLATE = "patterns_template.html"
-OUTPUT = "02_demand_patterns.html"
+OUTPUT = "outputs/02_demand_patterns.html"
 PLACEHOLDER = "/*__DATA__*/"
 
 HIST_BINS = 44
@@ -298,6 +298,9 @@ def main():
     template = open(args.template).read()
     if PLACEHOLDER not in template:
         raise SystemExit(f"{args.template} has no {PLACEHOLDER} placeholder")
+    out_dir = os.path.dirname(args.out)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
     payload = json.dumps(stats, separators=(",", ":"))
     open(args.out, "w").write(template.replace(PLACEHOLDER, payload))
 
