@@ -30,7 +30,7 @@ from datetime import date, timedelta
 
 __all__ = [
     "LastWeekday", "RecentAverage", "StoreWeekdayMean", "LeakyLastWeekday",
-    "score", "mae", "rmse", "prepare",
+    "score", "mae", "wape", "rmse", "prepare",
 ]
 
 RECENT_WINDOW = 28  # trading days -- four weeks, so every weekday is represented
@@ -200,6 +200,17 @@ def mae(pairs):
     return sum(abs(a - p) for a, p in pairs) / len(pairs) if pairs else 0.0
 
 
+def wape(pairs):
+    """Weighted absolute percentage error: total error over total actual.
+
+    Scale-relative, so it reads as "we are out by x% of the takings that
+    actually happened" -- but unlike MAPE it is a single ratio of sums, so a
+    near-zero actual cannot blow it up.
+    """
+    denom = sum(a for a, _ in pairs)
+    return 100 * sum(abs(a - p) for a, p in pairs) / denom if denom else 0.0
+
+
 def rmse(pairs):
     """Root mean squared error -- a diagnostic for large individual misses."""
     if not pairs:
@@ -207,16 +218,22 @@ def rmse(pairs):
     return (sum((a - p) ** 2 for a, p in pairs) / len(pairs)) ** 0.5
 
 
-def score(baseline, holdout_rows, score_closed=False):
+def score(baseline, holdout_rows, score_closed=False, stores=None):
     """Score a fitted baseline over a holdout window.
 
     Closed days are predicted as exactly 0 and, by default, left out of the
     score: `Open` is published ahead of the window, so a closure is a known
     fact rather than a forecast. Scoring them would hand the rule a large block
-    of free exact answers. Pass score_closed=True to measure that inflation.
+    of free exact answers -- which lowers the number without improving any
+    forecast. Pass score_closed=True to measure that operational total.
+
+    `stores` restricts scoring to a population (e.g. the stores present in the
+    live forecast window). Pass None to score every store in the rows given.
     """
     pairs, per_store = [], collections.defaultdict(list)
     for r in holdout_rows:
+        if stores is not None and r["store"] not in stores:
+            continue
         pred = 0.0 if not r["open"] else baseline.predict_one(r)
         if not r["open"] and not score_closed:
             continue
@@ -228,6 +245,7 @@ def score(baseline, holdout_rows, score_closed=False):
         "name": baseline.name,
         "description": baseline.description,
         "mae": mae(pairs),
+        "wape": wape(pairs),
         "rmse": rmse(pairs),
         "n": len(pairs),
         "per_store_mae": {s: sum(v) / len(v) for s, v in per_store.items()},

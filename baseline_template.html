@@ -87,6 +87,18 @@
   #tip .t1 { font-weight:650; margin-bottom:3px; }
   #tip .t2 { color:var(--ink-2); }
 
+  .subhead { font-size:11px; font-weight:650; letter-spacing:0.06em; text-transform:uppercase;
+              color:var(--ink-2); margin-bottom:9px; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .popn { font-size:10px; font-weight:600; letter-spacing:0.04em; text-transform:none;
+          color:var(--ink-muted); border:1px solid var(--border); border-radius:3px; padding:1px 6px; }
+  .card.invalid { border-color:var(--crit); }
+  .card.invalid > h2 { color:var(--crit-ink); }
+  .seasonal { margin-top:18px; border:1px solid var(--border); border-left:3px solid var(--s3);
+              border-radius:5px; background:var(--surface-2); padding:13px 16px; }
+  .seasonal .sh { font-size:12px; font-weight:650; display:flex; align-items:center; gap:9px; margin-bottom:6px; }
+  .seasonal p { margin:0; font-size:12.5px; color:var(--ink-2); line-height:1.55; }
+  .seasonal b { color:var(--ink); font-weight:600; }
+
   .sectionrule { display:flex; align-items:center; gap:14px; margin:26px 0 16px; }
   .sectionrule::before, .sectionrule::after { content:""; height:1px; background:var(--grid); flex:1; }
   .sectionrule span { font-size:11px; font-weight:650; letter-spacing:0.1em; text-transform:uppercase; color:var(--ink-muted); }
@@ -165,17 +177,33 @@
 
   <div class="duo">
     <div class="card">
-      <h2>Baseline accuracy on the holdout <span class="chip ok" id="blchip"></span></h2>
+      <h2>Baseline accuracy <span class="chip ok" id="blchip"></span></h2>
       <p class="lead" id="bllead"></p>
       <div id="blchart"></div>
       <div id="bltbl" style="margin-top:16px"></div>
     </div>
     <div class="card" id="bestcard">
       <h2>Benchmark to beat <span class="chip ok">Selected</span></h2>
-      <p class="lead">The strongest naive rule. Every model reported at Stage 5 must show MAE on this same split, beside this number.</p>
+      <p class="lead">The strongest naive rule on the primary population. Every model reported at Stage 5 must show these figures on this same split.</p>
       <div id="besthero"></div>
       <p class="rule" id="bestwhy"></p>
-      <p class="note" id="leaknote"></p>
+    </div>
+  </div>
+
+  <div class="card full">
+    <h2>Secondary measures <span class="chip prop">Not the headline</span></h2>
+    <p class="lead">Reported for completeness. Neither replaces the primary score, and neither is evidence of better forecasting.</p>
+    <div class="duo" style="margin-bottom:0">
+      <div>
+        <div class="subhead">All-day &mdash; operational measure <span class="popn" id="adpop"></span></div>
+        <div id="adtbl"></div>
+        <p class="note" id="adnote"></p>
+      </div>
+      <div>
+        <div class="subhead">All stores &mdash; population diagnostic <span class="popn" id="aspop"></span></div>
+        <div id="astbl"></div>
+        <p class="note" id="asnote"></p>
+      </div>
     </div>
   </div>
 
@@ -189,19 +217,40 @@
 
   <div class="duo">
     <div class="card">
-      <h2>Accuracy by store <span class="chip ok" id="pschip"></span></h2>
+      <h2>Store-level MAE distribution <span class="chip ok" id="pschip"></span></h2>
       <p class="lead" id="pslead"></p>
       <div id="pschart"></div>
       <div class="legend" id="pslegend"></div>
       <p class="rule" id="pstake"></p>
     </div>
     <div class="card">
-      <h2>Open-day performance <span class="chip prop">Rule in force</span></h2>
-      <p class="lead">Only open days are scored. The comparison below shows what including closed days would do to the headline number.</p>
-      <div id="odkv"></div>
-      <p class="rule warnl" id="odrule"></p>
-      <div style="margin-top:16px" id="dowchart"></div>
-      <p class="note" id="dowtake"></p>
+      <h2>Baseline MAE by day of week <span class="chip ok">Primary population</span></h2>
+      <p class="lead">Where the benchmark&rsquo;s error sits across the week. Absolute error, not a difficulty ranking.</p>
+      <div id="dowchart"></div>
+      <p class="rule" id="dowtake"></p>
+    </div>
+  </div>
+
+  <div class="card full">
+    <h2>Rolling-origin stability <span class="chip ok" id="rochip"></span></h2>
+    <p class="lead" id="rolead"></p>
+    <div id="rochart"></div>
+    <div id="rotbl" style="margin-top:16px"></div>
+    <p class="rule" id="rotake"></p>
+    <div class="seasonal" id="seasonal"></div>
+  </div>
+
+  <div class="duo">
+    <div class="card invalid">
+      <h2>Invalid diagnostic <span class="chip bad">Not a benchmark</span></h2>
+      <p class="lead">Excluded from benchmark selection. Recorded so the shortcut is measured rather than assumed.</p>
+      <div id="leakbody"></div>
+    </div>
+    <div class="card">
+      <h2>Inferred <span class="mono">Open</span> values <span class="chip ok" id="oichip"></span></h2>
+      <p class="lead" id="oilead"></p>
+      <div id="oitbl"></div>
+      <p class="rule" id="oirule"></p>
     </div>
   </div>
 
@@ -233,7 +282,7 @@
 
   <div class="duo">
     <div class="card">
-      <h2>Closed days &amp; zero sales <span class="chip prop">In force, unconfirmed</span></h2>
+      <h2>Closed days &amp; zero sales <span class="chip ok">Approved</span></h2>
       <p class="lead">Closures are published in advance, so they are knowable rather than predictable. The rule decides which rows a score is even computed over.</p>
       <div id="closedkv"></div>
       <p class="rule warnl" id="closedrule"></p>
@@ -280,9 +329,10 @@ const hideTip=()=>tip.style.opacity=0;
 /* ---------- decision gates ---------- */
 [['Target','ok','Confirmed','Sales','Daily revenue per store, in the source file&rsquo;s currency unit.'],
  ['Grain','ok','Confirmed','one store &times; one calendar day','Store + Date is unique in train and test, zero duplicates.'],
- ['Primary metric','ok','Specified','MAE','Mean absolute error, in the target&rsquo;s own units. Chosen by the business.'],
+ ['Metrics','ok','Approved','MAE · WAPE · RMSE','MAE primary in the target&rsquo;s own units; WAPE for scale context; RMSE as an outlier-sensitive diagnostic.'],
  ['Split cutoff','ok','Approved',D.cutoff,`Last ${D.horizon} days of train held out, matching the ${D.horizon}-day horizon.`],
- ['Closed-day rule','prop','Applied as proposed','predict 0, exclude from score','Used for every figure on this page. Never separately signed off &mdash; see open decisions.'],
+ ['Closed-day rule','ok','Approved','predict 0, score open days','Closed days take a business rule of 0. Open-day MAE is the headline; the all-day figure is operational only.'],
+ ['Store scope','ok','Approved',`${D.bl.scope.primary_stores} in-scope stores`,`The stores present in the live forecast window. All ${D.bl.scope.all_stores} are reported only as a secondary diagnostic.`],
  ['Customers','ok','Excluded','not a predictor','Train-only, same-day measurement. Locked at Stage 1 and not reopened.'],
 ].forEach(([name,cls,status,val,why])=>{
   const g=el('div','gate '+cls);
@@ -294,15 +344,28 @@ const hideTip=()=>tip.style.opacity=0;
 });
 
 /* ================= STAGE 4 — baseline results ================= */
-const B=D.bl, BEST=B.results.find(r=>r.key===B.best);
+const B=D.bl, SC=B.scope, BEST=B.primary.find(r=>r.key===B.best);
+const RULE_NAME=k=>B.primary.find(r=>r.key===k).name;
 
-$('#blchip').textContent=`${n0(BEST.n)} scored rows`;
-$('#bllead').innerHTML=`Mean absolute error over every open day in the holdout, in the target&rsquo;s own units. `+
-  `A typical trading day in this window turns over <b>${n0(B.hold_mean)}</b>, so the percentages below are error as a share of an average day.`;
+$('#blchip').textContent=`${n0(SC.primary_stores)} in-scope stores · open days`;
+$('#bllead').innerHTML=`Primary population: the <b>${n0(SC.primary_stores)} stores that appear in the live forecast window</b>, scored on `+
+  `open days only &mdash; ${n0(SC.primary_rows)} store-days. A typical trading day here turns over <b>${n0(B.hold_mean)}</b>.`;
 
+function metricTable(mount, rows, best){
+  const t=el('table');
+  t.innerHTML='<thead><tr><th>Rule</th><th class="num">MAE</th><th class="num">WAPE</th><th class="num">RMSE</th></tr></thead>';
+  const tb=el('tbody');
+  rows.forEach(r=>{
+    const tr=el('tr');
+    tr.innerHTML=`<td>${r.key===best?'<b>'+r.name+'</b>':r.name}</td>`+
+      `<td class="num">${n0(r.mae)}</td><td class="num">${r.wape.toFixed(2)}%</td><td class="num">${n0(r.rmse)}</td>`;
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb); mount.appendChild(t);
+}
 (function(){
-  const mx=Math.max(...B.results.map(r=>r.mae));
-  B.results.slice().sort((a,b)=>a.mae-b.mae).forEach(r=>{
+  const mx=Math.max(...B.primary.map(r=>r.mae));
+  B.primary.forEach(r=>{
     const win=r.key===B.best;
     const row=el('div','blrow'+(win?' win':''));
     row.innerHTML=`<span class="nm">${r.name}</span>`+
@@ -310,78 +373,66 @@ $('#bllead').innerHTML=`Mean absolute error over every open day in the holdout, 
       `<span class="vl">${n0(r.mae)}</span>`;
     $('#blchart').appendChild(row);
   });
-  const t=el('table');
-  t.innerHTML='<thead><tr><th>Rule</th><th class="num">MAE</th><th class="num">% of typical day</th><th class="num">RMSE</th></tr></thead>';
-  const tb=el('tbody');
-  B.results.slice().sort((a,b)=>a.mae-b.mae).forEach(r=>{
-    const tr=el('tr');
-    tr.innerHTML=`<td>${r.key===B.best?'<b>'+r.name+'</b>':r.name}</td>`+
-      `<td class="num">${n0(r.mae)}</td><td class="num">${r.mae_pct.toFixed(1)}%</td><td class="num">${n0(r.rmse)}</td>`;
-    tb.appendChild(tr);
-  });
-  t.appendChild(tb); $('#bltbl').appendChild(t);
+  metricTable($('#bltbl'), B.primary, B.best);
 })();
 
 (function(){
   const h=el('div','hero');
-  h.innerHTML=`<span class="big">${n0(BEST.mae)}</span><span class="unit">MAE &middot; ${BEST.mae_pct.toFixed(1)}% of a typical day</span>`;
+  h.innerHTML=`<span class="big">${n0(BEST.mae)}</span><span class="unit">MAE &middot; WAPE ${BEST.wape.toFixed(2)}%</span>`;
   $('#besthero').appendChild(h);
   $('#besthero').appendChild(el('div','heroname',BEST.name));
   $('#besthero').appendChild(el('div','herosub',BEST.description));
-})();
-(function(){
-  const others=B.results.filter(r=>r.key!==B.best).sort((a,b)=>a.mae-b.mae);
-  $('#bestwhy').innerHTML=`<b>Why this one wins:</b> it averages many observations of the same store on the same weekday, so it cancels day-to-day `+
-    `noise that the other two carry. It beats ${others[0].name.toLowerCase()} by ${Math.round(100*(1-BEST.mae/others[0].mae))}% and `+
-    `${others[1].name.toLowerCase()} by ${Math.round(100*(1-BEST.mae/others[1].mae))}%. In business terms a typical store-day forecast is out by `+
-    `about ${n0(BEST.mae)} of takings &mdash; roughly ${BEST.mae_pct.toFixed(1)}% of the day.`;
-  $('#leaknote').innerHTML=`<b>A note on the tempting shortcut.</b> Predicting each day from the same store&rsquo;s actual takings seven days earlier &mdash; `+
-    `reading values from inside the forecast window, which is not possible in production &mdash; scores MAE ${n0(B.leak.mae)}. `+
-    `That is <b>worse</b>, not better: a single lagged day is noisier than an average of many. The leak is still disqualifying on principle, `+
-    `but here it would not even have flattered the result.`;
+  const others=B.primary.filter(r=>r.key!==B.best);
+  $('#bestwhy').innerHTML=`<b>Why this one wins:</b> it averages many observations of the same store on the same weekday, cancelling day-to-day `+
+    `noise the other two carry. It beats ${others[0].name.toLowerCase()} by ${Math.round(100*(1-BEST.mae/others[0].mae))}% and `+
+    `${others[1].name.toLowerCase()} by ${Math.round(100*(1-BEST.mae/others[1].mae))}%. In business terms a typical store-day is out by about `+
+    `${n0(BEST.mae)} of takings, or ${BEST.wape.toFixed(1)}% of the takings that actually happened.`;
 })();
 
+/* ---------- secondary measures ---------- */
+$('#adpop').textContent=`${n0(SC.primary_stores)} stores · all days`;
+$('#aspop').textContent=`${n0(SC.all_stores)} stores · open days`;
+metricTable($('#adtbl'), B.allday, B.best);
+metricTable($('#astbl'), B.allstores, B.best);
+(function(){
+  const open=B.primary.find(r=>r.key===B.best), all=B.allday.find(r=>r.key===B.best);
+  $('#adnote').innerHTML=`Includes closed days, where predicted Sales is set to 0 as a business rule. MAE falls from ${n0(open.mae)} to `+
+    `${n0(all.mae)} <b>because ${n0(all.n-open.n)} known zeros are added to the denominator, not because any forecast improved</b>. `+
+    `It is an operational total-error figure only. Note that <b>WAPE is unchanged at ${all.wape.toFixed(2)}%</b>: closed days contribute nothing `+
+    `to either its numerator or its denominator, so it cannot be flattered this way.`;
+  const as=B.allstores.find(r=>r.key===B.best);
+  $('#asnote').innerHTML=`Adds the ${n0(SC.all_stores-SC.primary_stores)} stores absent from the live forecast window &mdash; ${n0(SC.dropped_rows)} `+
+    `extra store-days. The benchmark lands at MAE ${n0(as.mae)}, within ${Math.abs(as.mae-open.mae).toFixed(0)} of the primary figure, so the wider `+
+    `population is not hiding a materially different picture. Reported as a diagnostic; the primary score governs.`;
+})();
 /* ---------- worked example ---------- */
 (function(){
   const e=B.example, N=e.dates.length;
   $('#exchip').textContent='Store '+e.store;
-  $('#exlead').innerHTML=`Store ${e.store}, chosen because its average takings (<b>${n0(e.avg)}</b>) sit closest to the median store in the estate. `+
-    `Lines break on closed days, which are predicted as a known zero and left out of the score.`;
+  $('#exlead').innerHTML=`Store ${e.store}, the in-scope store whose average takings (<b>${n0(e.avg)}</b>) sit closest to the median of the `+
+    `primary population. Lines break on closed days, which are predicted as a known zero and left out of the score.`;
   const W=1480,H=250,ML=54,MR=14,MT=14,MB=42;
   const all=e.actual.concat(...Object.values(e.preds));
   const yMax=Math.ceil(Math.max(...all)/2000)*2000;
-  const x=i=>ML+(i/(N-1))*(W-ML-MR);
-  const y=v=>MT+(1-v/yMax)*(H-MT-MB);
-  const s=svg('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':`Actual takings against three baseline forecasts for store ${e.store} across the holdout`});
+  const x=i=>ML+(i/(N-1))*(W-ML-MR), y=v=>MT+(1-v/yMax)*(H-MT-MB);
+  const s=svg('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':`Actual takings against three baseline forecasts for store ${e.store}`});
   for(let v=0;v<=yMax;v+=2000){
     s.appendChild(svg('line',{x1:ML,x2:W-MR,y1:y(v),y2:y(v),class:'gl'}));
     const t=svg('text',{x:ML-8,y:y(v)+3.5,class:'axtxt','text-anchor':'end'}); t.textContent=n0(v); s.appendChild(t);
   }
-  // Shade the closed days rather than drawing a misleading dive to zero.
-  e.open.forEach((o,i)=>{
-    if(!o){
-      const w=(W-ML-MR)/(N-1);
-      s.appendChild(svg('rect',{x:x(i)-w/2,y:MT,width:w,height:H-MT-MB,fill:'var(--ink-muted)',opacity:.10}));
-    }
-  });
+  e.open.forEach((o,i)=>{ if(!o){ const w=(W-ML-MR)/(N-1);
+    s.appendChild(svg('rect',{x:x(i)-w/2,y:MT,width:w,height:H-MT-MB,fill:'var(--ink-muted)',opacity:.10})); }});
   const draw=(vals,color,width)=>{
     let d='',pen=false;
-    vals.forEach((v,i)=>{
-      if(!e.open[i]){ pen=false; return; }
-      d+=(pen?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1); pen=true;
-    });
+    vals.forEach((v,i)=>{ if(!e.open[i]){pen=false;return;} d+=(pen?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1); pen=true; });
     s.appendChild(svg('path',{d:d,fill:'none',stroke:color,'stroke-width':width,'stroke-linejoin':'round','stroke-linecap':'round'}));
   };
   const cols={last_weekday:'var(--s2)',recent_avg:'var(--s3)',store_weekday:'var(--s1)'};
   Object.keys(e.preds).forEach(k=>draw(e.preds[k],cols[k],1.5));
   draw(e.actual,'var(--ink)',2.5);
   s.appendChild(svg('line',{x1:ML,x2:W-MR,y1:H-MB,y2:H-MB,class:'base'}));
-  e.dates.forEach((d,i)=>{
-    if(i%7===0){
-      const t=svg('text',{x:x(i),y:H-MB+15,class:'axtxt','text-anchor':'middle'});
-      t.textContent=d.slice(5); s.appendChild(t);
-    }
-  });
+  e.dates.forEach((d,i)=>{ if(i%7===0){
+    const t=svg('text',{x:x(i),y:H-MB+15,class:'axtxt','text-anchor':'middle'}); t.textContent=d.slice(5); s.appendChild(t); }});
   const cross=svg('line',{x1:0,x2:0,y1:MT,y2:H-MB,stroke:'var(--ink-muted)','stroke-width':1,opacity:0});
   s.appendChild(cross);
   const hit=svg('rect',{x:ML,y:MT,width:W-ML-MR,height:H-MT-MB,fill:'transparent'});
@@ -391,45 +442,37 @@ $('#bllead').innerHTML=`Mean absolute error over every open day in the holdout, 
     cross.setAttribute('x1',x(i));cross.setAttribute('x2',x(i));cross.setAttribute('opacity',.5);
     if(!e.open[i]){ showTip(ev,e.dates[i],'Closed &mdash; predicted 0, not scored'); return; }
     showTip(ev,e.dates[i],`Actual <b>${n0(e.actual[i])}</b><br>`+
-      B.results.map(r=>`${r.name}: ${n0(e.preds[r.key][i])}`).join('<br>'));
+      B.primary.map(r=>`${r.name}: ${n0(e.preds[r.key][i])}`).join('<br>'));
   });
   hit.addEventListener('mouseleave',()=>{cross.setAttribute('opacity',0);hideTip();});
   s.appendChild(hit);
   $('#exchart').appendChild(s);
-
   const lg=$('#exlegend');
   lg.appendChild(el('span',null,`<i style="background:var(--ink)"></i>Actual`));
-  B.results.forEach(r=>lg.appendChild(el('span',null,
+  B.primary.forEach(r=>lg.appendChild(el('span',null,
     `<i style="background:${cols[r.key]}"></i>${r.name} <span style="color:var(--ink-muted)">MAE ${n0(e.mae[r.key])}</span>`)));
-
-  $('#extake').innerHTML=`<b>What to look for:</b> all three rules track the weekly rhythm, and all three miss the same peaks &mdash; `+
-    `the days this store trades well above its own norm are exactly where a naive rule has nothing to say. `+
-    `Closing that gap is what a model has to earn its keep on.`;
+  $('#extake').innerHTML=`<b>What to look for:</b> all three rules track the weekly rhythm and all three miss the same peaks &mdash; the days this `+
+    `store trades well above its own norm are exactly where a naive rule has nothing to say. Closing that gap is what a model has to earn its keep on.`;
 })();
 
-/* ---------- accuracy by store ---------- */
+/* ---------- store-level MAE distribution ---------- */
 (function(){
-  const pts=B.by_store, ss=B.store_summary;
-  $('#pschip').textContent=n0(ss.n)+' stores';
-  $('#pslead').innerHTML=`Each dot is one store: its average takings on a holdout day against its own MAE under the selected rule. `+
-    `Median store MAE is <b>${n0(ss.median)}</b>.`;
-  const W=560,H=260,ML=48,MR=12,MT=12,MB=36;
-  const xMax=Math.ceil(Math.max(...pts.map(p=>p[0]))/5000)*5000;
-  const yMax=Math.ceil(Math.max(...pts.map(p=>p[1]))/2000)*2000;
+  const d=B.store_dist;
+  $('#pschip').textContent=n0(d.n)+' in-scope stores';
+  $('#pslead').innerHTML=`Each dot is one store in the primary population: its average takings on an open day against its own MAE under the `+
+    `benchmark. Shown as context for the primary metric, which stays chain-level.`;
+  const W=560,H=260,ML=48,MR=12,MT=12,MB=40;
+  const xMax=Math.ceil(Math.max(...d.points.map(p=>p[0]))/5000)*5000;
+  const yMax=Math.ceil(Math.max(...d.points.map(p=>p[1]))/2000)*2000;
   const X=v=>ML+(v/xMax)*(W-ML-MR), Y=v=>MT+(1-v/yMax)*(H-MT-MB);
-  const s=svg('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Store average takings against store forecast error'});
+  const s=svg('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Store average takings against store baseline MAE'});
   for(let v=0;v<=yMax;v+=2000){
     s.appendChild(svg('line',{x1:ML,x2:W-MR,y1:Y(v),y2:Y(v),class:'gl'}));
     const t=svg('text',{x:ML-7,y:Y(v)+3.5,class:'axtxt','text-anchor':'end'}); t.textContent=n0(v); s.appendChild(t);
   }
-  // Guide: what a constant percentage error would look like.
-  const pct=BEST.mae_pct/100;
-  s.appendChild(svg('line',{x1:X(0),y1:Y(0),x2:X(xMax),y2:Y(xMax*pct),
-    stroke:'var(--s2)','stroke-width':1.5,opacity:.8}));
-  pts.forEach(([a,m])=>{
-    const c=svg('circle',{cx:X(a),cy:Y(Math.min(m,yMax)),r:2.4,fill:'var(--s1)',opacity:.42});
-    s.appendChild(c);
-  });
+  const pct=BEST.wape/100;
+  s.appendChild(svg('line',{x1:X(0),y1:Y(0),x2:X(xMax),y2:Y(xMax*pct),stroke:'var(--s2)','stroke-width':1.5,opacity:.8}));
+  d.points.forEach(([a,m])=>s.appendChild(svg('circle',{cx:X(a),cy:Y(Math.min(m,yMax)),r:2.4,fill:'var(--s1)',opacity:.42})));
   s.appendChild(svg('line',{x1:ML,x2:W-MR,y1:H-MB,y2:H-MB,class:'base'}));
   [0,.25,.5,.75,1].forEach(f=>{
     const t=svg('text',{x:X(f*xMax),y:H-MB+15,class:'axtxt','text-anchor':f===0?'start':f===1?'end':'middle'});
@@ -439,32 +482,18 @@ $('#bllead').innerHTML=`Mean absolute error over every open day in the holdout, 
   xl.textContent='average takings per open day'; s.appendChild(xl);
   $('#pschart').appendChild(s);
   $('#pslegend').innerHTML=`<span><i style="background:var(--s1);opacity:.6"></i>One store</span>`+
-    `<span><i style="background:var(--s2)"></i>Constant ${BEST.mae_pct.toFixed(1)}% error</span>`;
-  $('#pstake').innerHTML=`<b>Error scales with size.</b> Most stores sit near the ${BEST.mae_pct.toFixed(1)}% line, so the naive rule is roughly `+
-    `proportional rather than uniformly good: the middle 80% of stores fall between MAE ${n0(ss.p10)} and ${n0(ss.p90)}. `+
-    `Store ${ss.worst.store} is the hardest at ${n0(ss.worst.mae)} on ${n0(ss.worst.avg)} a day; store ${ss.sharpest.store} the easiest at `+
-    `${n0(ss.sharpest.mae)} on ${n0(ss.sharpest.avg)}. Safety stock set as a flat percentage would be far too loose for some sites and too tight for others.`;
+    `<span><i style="background:var(--s2)"></i>Constant ${BEST.wape.toFixed(1)}% of takings</span>`;
+  $('#pstake').innerHTML=`<b>Absolute error rises with store turnover.</b> Most stores sit near the ${BEST.wape.toFixed(1)}% line, and the middle 80% `+
+    `fall between MAE ${n0(d.p10)} and ${n0(d.p90)}, median ${n0(d.median)}. Store ${d.highest_mae.store} carries the <b>highest baseline MAE</b> at `+
+    `${n0(d.highest_mae.mae)} on ${n0(d.highest_mae.avg)} a day; store ${d.lowest_mae.store} the <b>lowest</b> at ${n0(d.lowest_mae.mae)} on `+
+    `${n0(d.lowest_mae.avg)}. These are error magnitudes under one naive rule, not a measure of how hard each store is to forecast.`;
 })();
 
-/* ---------- open-day performance ---------- */
+/* ---------- MAE by weekday ---------- */
 (function(){
-  const c=B.closed_effect;
-  [['Holdout rows scored (open only)',n0(c.n_open),true],
-   ['MAE on open days &mdash; the reported figure',n0(c.mae_open),false],
-   ['Rows if closed days were included',n0(c.n_all),false],
-   ['MAE if closed days were scored',n0(c.mae_all),false],
-  ].forEach(([k,v,tot])=>{
-    const r=el('div','kv'+(tot?' tot':''));
-    r.innerHTML=`<span class="k">${k}</span><span class="v2">${v}</span>`; $('#odkv').appendChild(r);
-  });
-  const drop=Math.round(100*(1-c.mae_all/c.mae_open));
-  $('#odrule').innerHTML=`<b>The rule is doing real work.</b> Scoring the ${n0(c.n_all-c.n_open)} closed days as well would drop MAE from `+
-    `${n0(c.mae_open)} to ${n0(c.mae_all)} &mdash; a ${drop}% improvement bought entirely with free exact zeros, not forecasting skill. `+
-    `Any model compared against this benchmark must be scored the same way.`;
-
-  const w=B.by_dow, W=520,H=132,ML=44,MR=10,MT=10,MB=32;
+  const w=B.by_dow, W=520,H=150,ML=48,MR=10,MT=10,MB=32;
   const yMax=Math.ceil(Math.max(...w.map(d=>d.mae))/500)*500;
-  const s=svg('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Forecast error by day of week'});
+  const s=svg('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Benchmark MAE by day of week'});
   for(let v=0;v<=yMax;v+=1000){
     const yy=H-MB-(v/yMax)*(H-MT-MB);
     s.appendChild(svg('line',{x1:ML,x2:W-MR,y1:yy,y2:yy,class:'gl'}));
@@ -472,10 +501,8 @@ $('#bllead').innerHTML=`Mean absolute error over every open day in the holdout, 
   }
   const bw=(W-ML-MR)/w.length;
   w.forEach((d,i)=>{
-    const h=(d.mae/yMax)*(H-MT-MB), x0=ML+i*bw+bw*0.2, bwid=bw*0.6;
-    const thin=d.n<1000;
-    const r=svg('rect',{x:x0,y:H-MB-h,width:bwid,height:h,rx:2,
-      fill:thin?'var(--ink-muted)':'var(--s1)',opacity:thin?.45:1});
+    const h=(d.mae/yMax)*(H-MT-MB), x0=ML+i*bw+bw*0.2, bwid=bw*0.6, thin=d.n<1000;
+    const r=svg('rect',{x:x0,y:H-MB-h,width:bwid,height:h,rx:2,fill:thin?'var(--ink-muted)':'var(--s1)',opacity:thin?.45:1});
     r.addEventListener('mousemove',ev=>showTip(ev,d.name,`MAE ${n0(d.mae)}<br>${n0(d.n)} scored rows`+
       (thin?'<br><b>Few open days &mdash; not comparable</b>':'')));
     r.addEventListener('mouseleave',hideTip);
@@ -486,9 +513,130 @@ $('#bllead').innerHTML=`Mean absolute error over every open day in the holdout, 
   $('#dowchart').appendChild(s);
   const wk=w.filter(d=>d.n>=1000);
   const hi=wk.reduce((a,b)=>a.mae>b.mae?a:b), lo=wk.reduce((a,b)=>a.mae<b.mae?a:b);
-  $('#dowtake').innerHTML=`Error is not spread evenly across the week: ${hi.name} is the hardest day at MAE ${n0(hi.mae)} and ${lo.name} the `+
-    `easiest at ${n0(lo.mae)}. ${hi.name} is also the busiest trading day, so the rule misses most where the money is. Sunday is shown muted &mdash; `+
-    `only ${n0(w[6].n)} open days fall in the holdout.`;
+  $('#dowtake').innerHTML=`<b>${hi.name} carries the highest baseline MAE</b> at ${n0(hi.mae)} and ${lo.name} the lowest at ${n0(lo.mae)}. `+
+    `${hi.name} is also the busiest trading day, so absolute error is largest where turnover is largest. Sunday is muted &mdash; only `+
+    `${n0(w[6].n)} open days fall in the holdout.`;
+})();
+
+/* ---------- rolling-origin stability ---------- */
+(function(){
+  const R=B.rolling, S=B.seasonal;
+  $('#rochip').textContent=`${R.length} windows · ${n0(SC.primary_stores)} stores`;
+  $('#rolead').innerHTML=`The same three rules refitted from scratch before each window and scored on open days in the primary population. `+
+    `Windows overlapping the 184-day panel gap are excluded, which is why only three consecutive origins are available.`;
+
+  const all=[{label:'Final holdout',start:D.hold.min,end:D.hold.max,results:B.primary,final:true}]
+    .concat(R.map(w=>({label:'Rolling origin',start:w.start,end:w.end,results:w.results,fit_days:w.fit_days})));
+  const W=1480,H=190,ML=54,MR=14,MT=14,MB=46;
+  const maes=all.flatMap(w=>w.results.map(r=>r.mae));
+  const yMax=Math.ceil(Math.max(...maes)/500)*500;
+  const s=svg('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Baseline MAE across the final holdout and three rolling origins'});
+  for(let v=0;v<=yMax;v+=500){
+    const yy=H-MB-(v/yMax)*(H-MT-MB);
+    s.appendChild(svg('line',{x1:ML,x2:W-MR,y1:yy,y2:yy,class:'gl'}));
+    const t=svg('text',{x:ML-8,y:yy+3.5,class:'axtxt','text-anchor':'end'}); t.textContent=n0(v); s.appendChild(t);
+  }
+  const cols={store_weekday:'var(--s1)',recent_avg:'var(--s3)',last_weekday:'var(--s2)'};
+  const gw=(W-ML-MR)/all.length;
+  all.forEach((w,gi)=>{
+    const keys=['store_weekday','recent_avg','last_weekday'];
+    const bw=gw*0.20;
+    keys.forEach((k,bi)=>{
+      const r=w.results.find(x=>x.key===k); if(!r) return;
+      const h=(r.mae/yMax)*(H-MT-MB), x0=ML+gi*gw+gw*0.14+bi*(bw+4);
+      const rect=svg('rect',{x:x0,y:H-MB-h,width:bw,height:h,rx:2,fill:cols[k]});
+      rect.addEventListener('mousemove',ev=>showTip(ev,`${r.name}`,
+        `${w.start} → ${w.end}<br>MAE <b>${n0(r.mae)}</b> · WAPE ${r.wape.toFixed(2)}%<br>${n0(r.n)} scored rows`));
+      rect.addEventListener('mouseleave',hideTip);
+      s.appendChild(rect);
+    });
+    const t=svg('text',{x:ML+gi*gw+gw/2,y:H-MB+16,class:'axtxt b','text-anchor':'middle'});
+    t.textContent=w.label; if(w.final) t.setAttribute('fill','var(--good-ink)'); s.appendChild(t);
+    const d=svg('text',{x:ML+gi*gw+gw/2,y:H-MB+30,class:'axtxt','text-anchor':'middle'});
+    d.textContent=`${w.start} → ${w.end}`; s.appendChild(d);
+  });
+  s.appendChild(svg('line',{x1:ML,x2:W-MR,y1:H-MB,y2:H-MB,class:'base'}));
+  $('#rochart').appendChild(s);
+  const rlg=el('div','legend');
+  ['store_weekday','recent_avg','last_weekday'].forEach(k=>
+    rlg.appendChild(el('span',null,`<i style="background:${cols[k]}"></i>${RULE_NAME(k)}`)));
+  $('#rochart').appendChild(rlg);
+
+  const t=el('table');
+  t.innerHTML='<thead><tr><th>Window</th><th class="num">Fit history</th><th>Winner</th>'+
+    '<th class="num">MAE</th><th class="num">WAPE</th><th class="num">Rows</th></tr></thead>';
+  const tb=el('tbody');
+  const rows=[{label:'Final holdout (approved)',start:D.hold.min,end:D.hold.max,fit_days:D.fit.days,results:B.primary,final:true}]
+    .concat(R.map(w=>({label:'Rolling origin',start:w.start,end:w.end,fit_days:w.fit_days,results:w.results})));
+  rows.forEach(w=>{
+    const top=w.results[0];
+    const tr=el('tr');
+    tr.innerHTML=`<td>${w.final?'<b>':''}${w.label}${w.final?'</b>':''}<div class="mono" style="color:var(--ink-muted)">${w.start} → ${w.end}</div></td>`+
+      `<td class="num">${n0(w.fit_days)} days</td><td>${top.name}</td>`+
+      `<td class="num">${n0(top.mae)}</td><td class="num">${top.wape.toFixed(2)}%</td><td class="num">${n0(top.n)}</td>`;
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb); $('#rotbl').appendChild(t);
+
+  const winners=new Set(R.map(w=>w.best).concat([B.best]));
+  const bm=R.map(w=>w.results.find(r=>r.key===B.best).mae).concat([BEST.mae]);
+  $('#rotake').innerHTML=`<b>The benchmark holds across every window.</b> ${RULE_NAME(B.best)} wins all `+
+    `${R.length+1} origins${winners.size===1?'':' (the runner-up order changes, the winner does not)'}, with MAE between `+
+    `${n0(Math.min(...bm))} and ${n0(Math.max(...bm))}. The final holdout at ${n0(BEST.mae)} sits inside that range, so it is a `+
+    `representative window rather than an unusually kind or harsh one.`;
+
+  const box=el('div','seasonal');
+  const st=S.results[0];
+  box.innerHTML=`<div class="sh">Season-matched diagnostic <span class="chip prop">Reported separately</span></div>`+
+    `<p>Same calendar dates two years earlier, <span class="mono">${S.start} → ${S.end}</span>, with only `+
+    `<b>${n0(S.fit_days)} days</b> of preceding history against ${n0(D.fit.days)} for the final holdout. `+
+    `Winner: <b>${st.name}</b> at MAE ${n0(st.mae)}, WAPE ${st.wape.toFixed(2)}%. `+
+    `It is <b>not</b> pooled with the three rolling origins &mdash; a rule fitted on ${n0(S.fit_days)} days is not measuring the same thing as one `+
+    `fitted on ${n0(D.fit.days)}. Read it only as a check that the seasonal position of the window is not driving the result: at `+
+    `WAPE ${st.wape.toFixed(2)}% against ${BEST.wape.toFixed(2)}% on the final holdout, it is not.</p>`;
+  $('#seasonal').replaceWith(box);
+})();
+
+/* ---------- invalid diagnostic ---------- */
+(function(){
+  const l=B.leak;
+  $('#leakbody').innerHTML=
+    `<div class="hero"><span class="big" style="color:var(--crit-ink)">${n0(l.mae)}</span>`+
+    `<span class="unit">MAE &middot; WAPE ${l.wape.toFixed(2)}%</span></div>`+
+    `<div class="heroname">${l.name}</div>`+
+    `<p class="note">Predicts each day from the same store&rsquo;s actual takings seven days earlier, reading values from inside the forecast `+
+    `window. On a ${D.horizon}-day horizon those actuals do not exist when the forecast is made, so <b>this rule cannot be run in production</b> `+
+    `and is excluded from benchmark selection.</p>`+
+    `<p class="note">Measured rather than assumed: it scores <b>worse</b> than all three valid rules, because a single lagged day is noisier than `+
+    `an average of many. The leak is disqualifying on principle regardless &mdash; but here it would not even have flattered the result.</p>`;
+})();
+
+/* ---------- inferred Open ---------- */
+(function(){
+  const oi=D.open_inference;
+  $('#oichip').textContent=`${oi.length} rows`;
+  const stores=[...new Set(oi.map(r=>r.store))];
+  $('#oilead').innerHTML=`The forecast window contains ${oi.length} rows with a blank <span class="mono">Open</span>, all at `+
+    `store ${stores.join(', ')}. Each is resolved from that store&rsquo;s own weekday history and listed here &mdash; never silently filled. `+
+    `This affects the future forecast only; <span class="mono">Open</span> is observed throughout the historical holdout.`;
+  const t=el('table');
+  t.innerHTML='<thead><tr><th>Date</th><th>Day</th><th class="num">Open in history</th><th>Basis</th><th>Inferred</th></tr></thead>';
+  const tb=el('tbody');
+  const dows=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  oi.slice().sort((a,b)=>a.date<b.date?-1:1).forEach(r=>{
+    const tr=el('tr');
+    tr.innerHTML=`<td class="mono">${r.date}</td><td>${dows[r.dow-1]}</td>`+
+      `<td class="num">${r.open_days}/${r.total_days} (${r.rate}%)</td>`+
+      `<td style="color:var(--ink-2)">${r.basis}</td>`+
+      `<td><b style="color:${r.inferred?'var(--good-ink)':'var(--crit-ink)'}">${r.inferred?'Open':'Closed'}</b></td>`;
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb); $('#oitbl').appendChild(t);
+  const allPrimary=oi.every(r=>r.basis==='store weekday history');
+  $('#oirule').innerHTML=`<b>Rule:</b> open if the store traded on a majority of that weekday in history. `+
+    `<b>Fallback 1:</b> no store-weekday history &rarr; the chain&rsquo;s modal Open for that weekday. `+
+    `<b>Fallback 2:</b> store absent from train &rarr; the same chain-wide modal. `+
+    (allPrimary?`All ${oi.length} rows resolved on the primary rule; no fallback was needed.`:`Some rows required a fallback &mdash; see the basis column.`);
 })();
 
 /* ---------- timeline ---------- */
@@ -545,8 +693,9 @@ $('#tllead').innerHTML=`The holdout is not a round number chosen for convenience
   `test.csv is ${D.horizon} days. Validating over a shorter window would flatter the result; a longer one would test a distance the business never has to forecast.`;
 (function(){
   [['Fitting rows (to '+D.fit.max+')',n0(D.fit.rows)],
-   ['Holdout rows ('+D.hold.min+' onward)',n0(D.hold.rows)],
-   ['&nbsp;&nbsp;&mdash; open, would be scored',n0(D.hold.scored)],
+   ['Holdout rows, all '+n0(D.hold.stores)+' stores',n0(D.hold.rows)],
+   ['&nbsp;&nbsp;&mdash; open days, all stores <span style="color:var(--ink-muted)">(secondary)</span>',n0(D.hold.scored)],
+   ['&nbsp;&nbsp;&mdash; open days, '+n0(D.test.stores)+' in-scope stores <b>(primary)</b>',n0(D.bl.scope.primary_rows)],
    ['&nbsp;&nbsp;&mdash; closed, excluded from the score',n0(D.hold.closed)],
    ['Real forecast window (no Sales)',n0(D.test.rows)]
   ].forEach(([k,v],i)=>{
@@ -554,9 +703,10 @@ $('#tllead').innerHTML=`The holdout is not a round number chosen for convenience
     r.innerHTML=`<span class="k">${k}</span><span class="v2">${v}</span>`; $('#tlkv').appendChild(r);
   });
 })();
-$('#tlrule').innerHTML=`<b>Approved and in use.</b> Every figure on this page is scored on this window. Note that the holdout spans `+
-  `<b>${n0(D.hold.stores)} stores</b> while the real forecast window covers <b>${n0(D.test.stores)}</b> &mdash; the `+
-  `${n0(D.hold.stores-D.test.stores)} out-of-scope stores are currently included, which remains an open question below.`;
+$('#tlrule').innerHTML=`<b>Approved and in use.</b> Every headline figure is scored on this window, restricted to the `+
+  `<b>${n0(D.test.stores)} stores that appear in the live forecast window</b>. The holdout period itself contains `+
+  `${n0(D.hold.stores)} stores; the other ${n0(D.hold.stores-D.test.stores)} are out of forecast scope and appear only in the secondary `+
+  `population diagnostic.`;
 
 /* ---------- random split diagram ---------- */
 (function(){
@@ -613,8 +763,10 @@ $('#metriclead').innerHTML=`Judged against the spread the holdout actually conta
   const tb=el('tbody');
   [['MAE','<span class="chip ok">Primary</span>',
     'Reads in the target&rsquo;s own units &mdash; an error of 700 means 700 of takings per store-day, which a planner can act on directly. Treats every store-day equally, so the estate&rsquo;s many mid-sized stores are not drowned out by a handful of very large ones.'],
-   ['RMSE','<span class="chip prop">Secondary, open</span>',
-    `Squares the error, so the long right tail out to ${n0(D.hold_sales.max)} dominates the score. Useful as a diagnostic for large individual misses; not agreed as a headline number.`],
+   ['WAPE','<span class="chip ok">Secondary</span>',
+    'Total error over total actual takings, so it reads as a share of the money that actually came through the tills. Being a ratio of sums it cannot be blown up by a single near-zero day, and closed days leave it unchanged &mdash; they add nothing to either sum.'],
+   ['RMSE','<span class="chip ok">Diagnostic</span>',
+    `Squares the error, so the long right tail out to ${n0(D.hold_sales.max)} dominates. Kept as an outlier-sensitive diagnostic, not a headline.`],
    ['RMSPE / MAPE','<span class="chip bad">Not used</span>',
     `Percentage errors are undefined at zero and explode near it. Train contains ${n0(D.all.zero)} zero-sales rows, so a percentage metric would need those rows excluded before it could be computed at all &mdash; the exclusion, not the model, would drive the number.`],
   ].forEach(([m,st,b])=>{
@@ -624,9 +776,9 @@ $('#metriclead').innerHTML=`Judged against the spread the holdout actually conta
   });
   t.appendChild(tb); $('#metrictbl').appendChild(t);
 })();
-$('#metricrule').innerHTML=`<b>MAE is primary because it is the one number that converts straight into money per store per day</b> &mdash; `+
-  `the unit a stock or staffing decision is actually made in. Every model reported at Stage 5 must show MAE on this split beside at least one `+
-  `naive baseline computed the same way.`;
+$('#metricrule').innerHTML=`<b>MAE is primary because it converts straight into money per store per day.</b> WAPE sits beside it for scale `+
+  `context, and RMSE flags outlier misses. The store-level MAE distribution is shown for context but does not replace the chain-level primary `+
+  `metric. Every model reported at Stage 5 must show all three on this split, beside at least one naive baseline computed the same way.`;
 
 /* ---------- closed days ---------- */
 (function(){
@@ -642,10 +794,10 @@ $('#metricrule').innerHTML=`<b>MAE is primary because it is the one number that 
 $('#closedrule').innerHTML=`<b>The rule in force.</b> Where <span class="mono">Open = 0</span>, predict exactly 0 and leave the row out of the score. `+
   `Closed days are published ahead, and <span class="mono">Open</span> is supplied for every row of the forecast window, so a closure is a known `+
   `fact rather than something to be predicted.`;
-$('#closednote').innerHTML=`Scoring closed rows instead would hand the model ${n0(D.hold.closed)} free exact answers in the holdout alone, `+
-  `pulling MAE down by roughly ${Math.round(100*D.hold.closed/D.hold.rows)}% for no forecasting skill whatsoever. That is why this rule has to be `+
-  `confirmed before any two runs are compared. Separately, <b>${D.test_open_blank} rows in the real forecast window have a blank `+
-  `<span class="mono">Open</span></b> and still need a stated rule of their own.`;
+$('#closednote').innerHTML=`Scoring closed rows instead adds ${n0(D.hold.closed)} known zeros to the holdout, lowering MAE without improving `+
+  `any forecast &mdash; which is why the all-day figure is reported as an operational measure and never as accuracy. `+
+  `The ${D.test_open_blank} blank <span class="mono">Open</span> values in the real forecast window are resolved by the documented `+
+  `inference rule above; <span class="mono">Open</span> is observed throughout this historical holdout, so none of them affect these scores.`;
 
 /* ---------- excluded ---------- */
 (function(){
@@ -667,16 +819,15 @@ $('#exclrule').innerHTML=`<b>Customers stays out.</b> It correlates strongly wit
   `engineered feature &mdash; state where its value comes from on a date inside the forecast window.`;
 
 /* ---------- open questions ---------- */
-[[`<b>Confirm the closed-day rule.</b> Every figure on this page excludes closed days from the score. It was proposed at Stage 3 and applied here, but never separately signed off &mdash; and it moves the headline by ${Math.round(100*(1-D.bl.closed_effect.mae_all/D.bl.closed_effect.mae_open))}%.`],
- [`<b>Holdout store scope.</b> The approved window covers ${n0(D.hold.stores)} stores; the real forecast window covers ${n0(D.test.stores)}. The ${n0(D.hold.stores-D.test.stores)} out-of-scope stores are currently included in every baseline figure above.`],
- [`<b>Secondary metric.</b> MAE is primary. Whether RMSE is reported alongside it, and whether any per-store normalisation is used, is open.`],
- [`<b>The ${D.test_open_blank} blank <span class="mono">Open</span> values</b> in the forecast window need a stated rule &mdash; treat as open, carry the store&rsquo;s last known status, or infer from the weekday pattern.`],
- [`<b>Rolling-origin validation.</b> A single holdout gives one number. Whether to add walk-forward origins for a stability estimate is open.`],
+[[`<b>Extend the rolling-origin set.</b> Only three consecutive 48-day origins sit clear of the 184-day panel gap. Testing further back means either accepting a ${n0(D.bl.scope.all_stores-935)}-store drop in coverage or changing the window length.`],
+ [`<b>Per-store reporting.</b> The store-level MAE distribution is shown for context. Whether any store-level threshold is used operationally is undecided, and would be an inventory question rather than a forecasting one.`],
+ [`<b>Rolling-origin cadence for Stage 5.</b> Whether a model is re-scored on all four windows or only the final holdout is open.`],
 ].forEach(([t])=>{ const li=el('li'); li.innerHTML=t; $('#openq').appendChild(li); });
 
 $('#foot').innerHTML=`<b>Stage 4 complete &mdash; baselines only. No model has been fitted and no forecast produced for the live window.</b> `+
-  `Three naive rules were fitted on data ending ${D.fit.max} and scored on ${D.hold.min} to ${D.hold.max}. The benchmark is `+
-  `<b>${BEST.name}</b> at <b>MAE ${n0(BEST.mae)}</b>, or ${BEST.mae_pct.toFixed(1)}% of a typical trading day. `+
-  `A model is only worth deploying if it beats that number on this split, scored the same way &mdash; and the baseline code in `+
+  `Three naive rules were fitted on data ending ${D.fit.max} and scored on ${n0(D.bl.scope.primary_stores)} in-scope stores over `+
+  `${D.hold.min} to ${D.hold.max}, then re-checked on ${D.bl.rolling.length} earlier rolling origins and one season-matched window. `+
+  `The benchmark is <b>${BEST.name}</b> at <b>MAE ${n0(BEST.mae)}</b> / <b>WAPE ${BEST.wape.toFixed(2)}%</b>, and it wins every window tested. `+
+  `A model is only worth deploying if it beats that on this split, scored the same way &mdash; the code in `+
   `<span class="mono">baselines.py</span> is reusable so the comparison stays like-for-like.`;
 </script>

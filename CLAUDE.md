@@ -173,24 +173,136 @@ Regenerate the dashboard and re-check this section if the data changes.
   Promo2SinceWeek, Promo2SinceYear, PromoInterval.
 - **Train-only columns: `Sales` (the target) and `Customers`.** See rule 5.
 
-**Stage 1 output**
+**Stage outputs**
 
-- `01_data_audit.html` — the data audit dashboard, at the repository root.
-  Regenerate it whenever the underlying files change.
+- `01_data_audit.html` — data audit. Built by `build_audit.py`.
+- `02_demand_patterns.html` — descriptive demand patterns. Built by
+  `build_patterns.py`.
+- `03_baseline_dashboard.html` — validation design and naive baselines. Built
+  by `build_baseline.py` on top of `baselines.py`.
+- The HTML files are generated output. Edit the templates or the build scripts
+  and re-run; never hand-edit the rendered HTML.
+
+## Validation and scoring decisions
+
+Approved by the user. These govern every score reported from Stage 4 onward.
+
+**Split**
+
+- **Final holdout — 2015-06-14 to 2015-07-31**, the last 48 days of train,
+  matching the 48-day forecast horizon. Fitting data ends 2015-06-13.
+- **Rolling-origin windows** (primary stability checks, 48 days each):
+  2015-04-27→2015-06-13, 2015-03-10→2015-04-26, 2015-01-21→2015-03-09. Each
+  rule is refitted from scratch on data before its window.
+- **Season-matched diagnostic — 2013-06-14 to 2013-07-31**, reported
+  separately and never pooled with the rolling origins: it sits on 164 days of
+  preceding history against 894 for the final holdout.
+- Windows overlapping the 184-day panel gap (2014-07-01 to 2014-12-31) are
+  excluded — only 935 stores report inside it. This is why just three
+  consecutive rolling origins are available.
+
+**Store scope**
+
+- **Primary evaluation population: the 856 stores present in `test.csv`**,
+  matching live forecast scope. 35,262 open store-days in the final holdout.
+- All 1,115 stores are reported only as a **secondary population diagnostic**
+  (45,884 open store-days). Both populations are labelled wherever either
+  appears.
+
+**Closed days**
+
+- Where `Open == 0`, predicted Sales is **0** as a business rule.
+- **Open-day MAE is the primary headline score.**
+- All-day MAE is reported only as a **secondary operational measure**. It is
+  lower because known zeros enter the denominator, and must never be described
+  as improved forecasting accuracy.
+- WAPE is unaffected by this choice: closed days contribute nothing to either
+  its numerator or its denominator.
+
+**Metrics**
+
+- **MAE primary** — in the target's own units, so it reads as money per store
+  per day.
+- **WAPE secondary** — total error over total actual, for scale context.
+- **RMSE** — outlier-sensitive diagnostic.
+- Store-level MAE distribution is reported for context and **does not replace**
+  the chain-level primary metric.
+- RMSPE and MAPE remain excluded: undefined at zero, and 172,871 train rows
+  have zero Sales.
+
+**Excluded from benchmark selection**
+
+- A "same weekday last week" rule reading actuals from *inside* the forecast
+  window is an **invalid diagnostic**, not a candidate. It cannot run in
+  production on a 48-day horizon. Measured at MAE 2,165 on the primary
+  population — worse than every valid rule, because a single lagged day is
+  noisier than an average.
+
+## Future-forecast data handling
+
+Decisions that apply to the live forecast window only. They do not affect the
+historical holdout, where `Open` is observed.
+
+- **Blank `test.Open`** — 11 rows, all store 622, dates 2015-09-05 to
+  2015-09-17. Inferred as open where the store traded on a majority of that
+  weekday in history. **Fallback 1**: no store-weekday history → the chain's
+  modal Open for that weekday. **Fallback 2**: store absent from train → the
+  same chain-wide modal. All 11 resolved on the primary rule; no fallback
+  fired. Every inferred value is listed on the dashboard — never silently
+  filled.
+
+## Stage 4 baseline results
+
+Primary population, open days, final holdout. The benchmark any model must beat.
+
+| rule | MAE | WAPE | RMSE |
+|---|---|---|---|
+| **Store weekday average** | **1,259** | **17.80%** | 1,664 |
+| Recent 28-day average | 1,387 | 19.61% | 1,827 |
+| Same weekday, last week | 1,454 | 20.56% | 2,055 |
+
+- The benchmark wins all three rolling origins and the season-matched window;
+  its MAE ranges 1,093 to 1,283 across them, with the final holdout at 1,259
+  inside that range.
+- Baselines are naive rules, not models. See Stage 5 for the first fitted model.
+
+## Stage 5 forecast results
+
+Primary population, open days, final holdout — the same split and scoring path
+as the baselines above.
+
+| model | MAE | WAPE | RMSE |
+|---|---|---|---|
+| Store weekday average (benchmark) | 1,259 | 17.80% | 1,664 |
+| **Multiplicative factor forecast** | **723** | **10.22%** | **1,015** |
+
+- **42.6% lower MAE than the benchmark**, and better at 852 of the 856 stores.
+- Model: each store's weekday average scaled by promotion (per store),
+  school holiday, day of month, month, and the store's recent level. Built by
+  `build_forecast.py` on top of `forecast.py`; output `04_forecast_review.html`.
+- Every input is knowable at forecast time. **`Customers` is excluded by
+  construction** — `prepare_features()` never carries it.
+- Feature selection ran on an inner window (2015-04-27 to 2015-06-13) with the
+  configuration frozen before the final holdout was scored once.
+- It also beats the benchmark on all three rolling origins, by 31% to 43%.
+- `StateHoliday` was **tested and rejected**: adding it raised inner-window MAE
+  from 734 to 764.
+- Known failure modes: one-off clearance surges (store 909 took 41,551 — the
+  dataset maximum — then closed for 16 days), and level breaks after the cutoff
+  (store 722 traded 26% below its recent norm). Store-level variability
+  correlates 0.452 with relative error. The 184-day panel gap does **not**
+  degrade forecasts: 10.0% relative error against 9.6% for full-history stores.
 
 ## Assumptions
 
 Unconfirmed. Each needs a user decision before it hardens into code.
 
-- **Closed days.** Whether rows with Open == 0 are excluded from fitting and
-  scored as zero, or modelled directly, is undecided. This materially changes
-  every error metric, so settle it before comparing runs.
-- **Evaluation metric** is unset. The dataset's competition origin suggests
-  RMSPE with zero-sales rows excluded, but this has not been confirmed.
-- **Validation split** is unset. A like-for-like choice would be the last 48
-  days of train (2015-06-14 to 2015-07-31), matching the horizon length.
 - **The 184-day gap** is presumed to be store refurbishment closures. The cause
   is not recorded in the data, and how the affected stores are treated in
   training is undecided.
 - **`store.csv` attributes are static as of the test window** — the file has no
   effective date, so it is treated as current. Unverified.
+- **Rolling-origin cadence for Stage 5** — whether a model is re-scored on all
+  four windows or only the final holdout is undecided.
+- **Extending the rolling-origin set** would mean either accepting a 180-store
+  drop in coverage or changing the window length. Undecided.
