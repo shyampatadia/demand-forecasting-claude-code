@@ -1,0 +1,398 @@
+<title>Validation Design</title>
+<style>
+  :root {
+    color-scheme: light;
+    --plane:#f9f9f7; --surface:#fcfcfb; --surface-2:#f4f3ef;
+    --ink:#0b0b0b; --ink-2:#52514e; --ink-muted:#898781;
+    --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
+    --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
+    --good:#0ca30c; --warn:#fab219; --crit:#d03b3b;
+    --good-ink:#006300; --crit-ink:#a52424; --warn-ink:#7a5300;
+    --sans:system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#232322;
+      --ink:#ffffff; --ink-2:#c3c2b7; --ink-muted:#898781;
+      --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+      --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+      --good-ink:#0ca30c; --crit-ink:#e66767; --warn-ink:#fab219;
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#232322;
+    --ink:#ffffff; --ink-2:#c3c2b7; --ink-muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+    --good-ink:#0ca30c; --crit-ink:#e66767; --warn-ink:#fab219;
+  }
+
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--plane); color:var(--ink);
+         font-family:var(--sans); font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1560px; margin:0 auto; padding:28px 32px 56px; }
+
+  .head { display:flex; justify-content:space-between; align-items:flex-end; gap:24px; flex-wrap:wrap; margin-bottom:20px; }
+  h1 { font-size:26px; font-weight:650; letter-spacing:-0.02em; margin:0 0 4px; }
+  .sub { color:var(--ink-2); font-size:13.5px; margin:0; max-width:78ch; }
+  .stage { font-size:11px; font-weight:650; letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--warn-ink); border:1px solid var(--warn); border-radius:3px; padding:5px 10px;
+    background:color-mix(in srgb, var(--warn) 12%, transparent); white-space:nowrap; }
+
+  /* gates */
+  .gates { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:16px; }
+  .gate { background:var(--surface); border:1px solid var(--border); border-radius:6px; overflow:hidden; }
+  .gate .bar { height:3px; background:var(--acc); }
+  .gate.ok   { --acc:var(--good); --acc-ink:var(--good-ink); }
+  .gate.prop { --acc:var(--warn); --acc-ink:var(--warn-ink); }
+  .gate .body { padding:12px 15px; }
+  .gate .row { display:flex; align-items:baseline; gap:8px; }
+  .gate .name { font-size:12px; font-weight:650; }
+  .gate .st { margin-left:auto; font-size:9.5px; font-weight:650; letter-spacing:0.05em; text-transform:uppercase;
+              color:var(--acc-ink); background:color-mix(in srgb, var(--acc) 16%, transparent);
+              padding:2px 7px; border-radius:3px; white-space:nowrap; }
+  .gate .val { font-size:12.5px; color:var(--ink); margin-top:5px; font-family:var(--mono); }
+  .gate .why { font-size:11.5px; color:var(--ink-2); margin-top:4px; line-height:1.45; }
+
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:18px 20px; min-width:0; }
+  .card > h2 { font-size:12px; font-weight:650; letter-spacing:0.07em; text-transform:uppercase;
+               color:var(--ink-2); margin:0 0 4px; display:flex; align-items:center; gap:9px; }
+  .card > .lead { font-size:12.5px; color:var(--ink-muted); margin:0 0 15px; }
+  .chip { font-size:10px; font-weight:650; letter-spacing:0.05em; padding:2px 7px; border-radius:3px; text-transform:uppercase; }
+  .chip.ok  { color:var(--good-ink); background:color-mix(in srgb,var(--good) 14%,transparent); }
+  .chip.prop{ color:var(--warn-ink); background:color-mix(in srgb,var(--warn) 20%,transparent); }
+  .chip.bad { color:var(--crit-ink); background:color-mix(in srgb,var(--crit) 14%,transparent); }
+  .duo { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+  .full { margin-bottom:14px; }
+
+  .note { font-size:12.5px; color:var(--ink-2); margin:14px 0 0; }
+  .note b { color:var(--ink); font-weight:600; }
+  .rule { border-left:2px solid var(--s1); padding-left:11px; margin-top:14px; font-size:12.5px; color:var(--ink); }
+  .rule.warnl { border-left-color:var(--warn); }
+  .rule.critl { border-left-color:var(--crit); }
+
+  svg { display:block; width:100%; height:auto; overflow:visible; }
+  .axtxt { font-size:10.5px; fill:var(--ink-muted); font-variant-numeric:tabular-nums; }
+  .axtxt.b { font-weight:650; fill:var(--ink-2); }
+
+  .tlseg { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:16px; }
+  .tlseg .seg { display:grid; grid-template-columns:auto 1fr; gap:10px; align-items:start;
+                border:1px solid var(--border); border-radius:5px; padding:10px 13px; background:var(--surface-2); }
+  .tlseg .sw { width:11px; height:11px; border-radius:2px; margin-top:3px; }
+  .tlseg .sn { font-size:12.5px; font-weight:650; display:flex; align-items:center; gap:7px; flex-wrap:wrap; }
+  .tlseg .tg { font-size:9.5px; font-weight:650; letter-spacing:0.05em; text-transform:uppercase;
+               color:var(--warn-ink); background:color-mix(in srgb,var(--warn) 20%,transparent);
+               padding:1px 6px; border-radius:3px; }
+  .tlseg .sr { font-family:var(--mono); font-size:11.5px; color:var(--ink-2); margin-top:3px; }
+  .tlseg .ss { font-size:11.5px; color:var(--ink-muted); margin-top:2px; font-variant-numeric:tabular-nums; }
+  .eqnote { font-size:12.5px; color:var(--ink-2); margin:14px 0 0; }
+  .eqnote b { color:var(--ink); font-weight:600; }
+
+  ul.reasons { margin:0; padding:0; list-style:none; display:flex; flex-direction:column; gap:11px; }
+  ul.reasons li { display:grid; grid-template-columns:auto 1fr; gap:10px; font-size:12.5px; color:var(--ink-2); line-height:1.5; }
+  ul.reasons .n { font-family:var(--mono); font-size:11px; font-weight:650; color:var(--crit-ink);
+                  background:color-mix(in srgb,var(--crit) 12%,transparent); border-radius:3px;
+                  padding:1px 6px; height:fit-content; }
+  ul.reasons b { color:var(--ink); font-weight:600; }
+
+  table { border-collapse:collapse; width:100%; font-size:12.5px; }
+  th { text-align:left; font-size:10.5px; font-weight:650; letter-spacing:0.06em; text-transform:uppercase;
+       color:var(--ink-muted); padding:0 12px 7px 0; border-bottom:1px solid var(--grid); white-space:nowrap; }
+  td { padding:7px 12px 7px 0; border-bottom:1px solid var(--grid); vertical-align:top; }
+  tr:last-child td { border-bottom:none; }
+  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; padding-right:14px; }
+  td.num:last-child, th.num:last-child { padding-right:0; }
+  .mono { font-family:var(--mono); font-size:11.5px; }
+  .kv { display:flex; justify-content:space-between; gap:14px; padding:6px 0; border-bottom:1px solid var(--grid); font-size:12.5px; }
+  .kv:last-child { border-bottom:none; }
+  .kv .k { color:var(--ink-2); }
+  .kv .v2 { font-variant-numeric:tabular-nums; font-weight:600; }
+  .kv.tot .k, .kv.tot .v2 { font-weight:650; color:var(--ink); }
+
+  .open-q { background:var(--surface); border:1px solid var(--warn); border-radius:6px; padding:16px 20px; }
+  .open-q h2 { color:var(--warn-ink); }
+  .open-q ol { margin:6px 0 0; padding-left:20px; font-size:12.5px; color:var(--ink-2); }
+  .open-q li { margin-bottom:7px; line-height:1.5; }
+  .open-q b { color:var(--ink); font-weight:600; }
+
+  .foot { margin-top:24px; padding-top:16px; border-top:1px solid var(--grid); font-size:12.5px; color:var(--ink-2); }
+  .foot b { color:var(--ink); }
+  @media (max-width:1080px){ .gates{grid-template-columns:1fr;} .duo{grid-template-columns:1fr;} }
+  @media (prefers-reduced-motion:reduce){ *{transition:none!important;} }
+</style>
+
+<div class="wrap">
+  <div class="head">
+    <div>
+      <h1>Validation Design</h1>
+      <p class="sub">How a forecast will be tested before one is built &mdash; the split, the metric, and the rules for days that cannot be scored. Settling this first is what stops a good-looking number from being an artefact of how it was measured.</p>
+    </div>
+    <div class="stage">Stage 3 &middot; Design only &middot; No model fitted</div>
+  </div>
+
+  <div class="gates" id="gates"></div>
+
+  <div class="card full">
+    <h2>Split timeline <span class="chip prop" id="tlchip">Cutoff proposed, not selected</span></h2>
+    <p class="lead" id="tllead"></p>
+    <div id="timeline"></div>
+    <div id="tlkv" style="margin-top:16px"></div>
+    <p class="rule warnl" id="tlrule"></p>
+  </div>
+
+  <div class="duo">
+    <div class="card">
+      <h2>Why a random split is invalid here <span class="chip bad">Excluded</span></h2>
+      <p class="lead">The same 48 days, split two ways. Only one of them asks the question the business actually faces.</p>
+      <div id="splitdiag"></div>
+      <ul class="reasons" id="reasons" style="margin-top:16px"></ul>
+    </div>
+
+    <div class="card">
+      <h2>Metric <span class="chip ok">MAE primary</span></h2>
+      <p class="lead" id="metriclead"></p>
+      <div id="metrictbl"></div>
+      <p class="rule" id="metricrule"></p>
+    </div>
+  </div>
+
+  <div class="duo">
+    <div class="card">
+      <h2>Closed days &amp; zero sales <span class="chip prop">Rule proposed</span></h2>
+      <p class="lead">Closures are published in advance, so they are knowable rather than predictable. The rule decides which rows a score is even computed over.</p>
+      <div id="closedkv"></div>
+      <p class="rule warnl" id="closedrule"></p>
+      <p class="note" id="closednote"></p>
+    </div>
+
+    <div class="card">
+      <h2>Excluded predictors <span class="chip bad">Locked</span></h2>
+      <p class="lead">Fixed at Stage 1 and not reopened here. These columns cannot enter a model at any stage.</p>
+      <div id="excltbl"></div>
+      <p class="rule critl" id="exclrule"></p>
+    </div>
+  </div>
+
+  <div class="open-q full">
+    <h2>Open decisions before a baseline runs</h2>
+    <ol id="openq"></ol>
+  </div>
+
+  <div class="foot" id="foot"></div>
+</div>
+
+<script>
+const D = {"horizon":48,"train":{"min":"2013-01-01","max":"2015-07-31","days":942},"test":{"min":"2015-08-01","max":"2015-09-17","days":48,"rows":41088,"stores":856},"cutoff":"2015-06-14","fit":{"rows":963689,"days":894,"stores":1115,"open":798508,"closed":165181,"zero":165235,"open_zero":54,"scored":798454,"min":"2013-01-01","max":"2015-06-13"},"hold":{"rows":53520,"days":48,"stores":1115,"open":45884,"closed":7636,"zero":7636,"open_zero":0,"scored":45884,"min":"2015-06-14","max":"2015-07-31"},"hold_sales":{"n":45884,"min":569.0,"p10":3947.0,"median":6564.0,"p90":10958.0,"max":41551.0,"mean":7145.4},"test_open_blank":11,"all":{"rows":1017209,"days":942,"stores":1115,"open":844392,"closed":172817,"zero":172871,"open_zero":54,"scored":844338,"closed_by_sunday":141137}};
+const $ = s => document.querySelector(s);
+const el = (t,c,h)=>{const e=document.createElement(t); if(c)e.className=c; if(h!==undefined)e.innerHTML=h; return e;};
+const SVGNS='http://www.w3.org/2000/svg';
+const svg=(t,a={})=>{const e=document.createElementNS(SVGNS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
+const n0=v=>Math.round(v).toLocaleString('en-US');
+
+/* ---------- decision gates ---------- */
+[['Target','ok','Confirmed','Sales','Daily revenue per store, in the source file&rsquo;s currency unit.'],
+ ['Grain','ok','Confirmed','one store &times; one calendar day','Store + Date is unique in train and test, zero duplicates.'],
+ ['Primary metric','ok','Specified','MAE','Mean absolute error, in the target&rsquo;s own units. Chosen by the business.'],
+ ['Split cutoff','prop','Proposed',D.cutoff,`Last ${D.horizon} days of train held out, matching the ${D.horizon}-day horizon. Awaiting sign-off.`],
+ ['Closed-day rule','prop','Proposed','predict 0, exclude from score','Closed rows are knowable in advance; scoring them would flatter the metric.'],
+ ['Customers','ok','Excluded','not a predictor','Train-only, same-day measurement. Locked at Stage 1 and not reopened.'],
+].forEach(([name,cls,status,val,why])=>{
+  const g=el('div','gate '+cls);
+  g.appendChild(el('div','bar'));
+  const b=el('div','body');
+  b.innerHTML=`<div class="row"><span class="name">${name}</span><span class="st">${status}</span></div>`+
+              `<div class="val">${val}</div><div class="why">${why}</div>`;
+  g.appendChild(b); $('#gates').appendChild(g);
+});
+
+/* ---------- timeline ---------- */
+(function(){
+  const W=1480,H=96,ML=8,MR=8,MT=30,bandH=36;
+  const total=D.fit.days+D.hold.days+D.test.days;
+  const s=svg('svg',{viewBox:`0 0 ${W} ${H}`,role:'img',
+    'aria-label':'Timeline showing the fitting period, the proposed holdout, and the real forecast window'});
+  const segs=[
+    {d:D.fit.days, c:'var(--s1)', op:1,   lab:'Fitting data', ink:'#fff'},
+    {d:D.hold.days,c:'var(--warn)',op:1,  lab:'Holdout',      ink:'#0b0b0b'},
+    {d:D.test.days,c:'var(--s2)', op:.35, lab:'Forecast',     ink:'var(--ink)'},
+  ];
+  let x=ML;
+  segs.forEach(g=>{
+    const w=(g.d/total)*(W-ML-MR)-2;
+    s.appendChild(svg('rect',{x:x,y:MT,width:w,height:bandH,fill:g.c,opacity:g.op,rx:3}));
+    // Only label inside the band when the label actually fits.
+    if(w>150){
+      const t=svg('text',{x:x+11,y:MT+22,'font-size':'12','font-weight':'650',fill:g.ink});
+      t.textContent=`${g.lab} · ${g.d} days`; s.appendChild(t);
+    }
+    x+=w+2;
+  });
+  // Cutoff marker, drawn above the band where there is room to breathe.
+  const cx=ML+(D.fit.days/total)*(W-ML-MR);
+  s.appendChild(svg('line',{x1:cx,x2:cx,y1:MT-12,y2:MT+bandH+6,stroke:'var(--warn-ink)','stroke-width':1.5}));
+  const ct=svg('text',{x:cx-8,y:MT-17,class:'axtxt b','text-anchor':'end'});
+  ct.textContent=`proposed cutoff ${D.cutoff}`; ct.setAttribute('fill','var(--warn-ink)'); s.appendChild(ct);
+  const a=svg('text',{x:ML,y:MT+bandH+18,class:'axtxt','text-anchor':'start'});
+  a.textContent=D.fit.min; s.appendChild(a);
+  const b=svg('text',{x:W-MR,y:MT+bandH+18,class:'axtxt','text-anchor':'end'});
+  b.textContent=D.test.max; s.appendChild(b);
+  $('#timeline').appendChild(s);
+
+  // Segment detail goes in an HTML legend, where it cannot collide.
+  const legend=el('div','tlseg');
+  [[ 'Fitting data','var(--s1)',1,`${D.fit.min} → ${D.fit.max}`,`${D.fit.days} days · ${n0(D.fit.rows)} rows`,''],
+   [ 'Holdout','var(--warn)',1,`${D.hold.min} → ${D.hold.max}`,`${D.hold.days} days · ${n0(D.hold.rows)} rows`,'Proposed'],
+   [ 'Forecast window','var(--s2)',.35,`${D.test.min} → ${D.test.max}`,`${D.test.days} days · ${n0(D.test.rows)} rows`,'No Sales']
+  ].forEach(([name,col,op,range,size,tag])=>{
+    const c=el('div','seg');
+    c.innerHTML=`<div class="sw" style="background:${col};opacity:${op}"></div>`+
+      `<div><div class="sn">${name}${tag?`<span class="tg">${tag}</span>`:''}</div>`+
+      `<div class="sr">${range}</div><div class="ss">${size}</div></div>`;
+    legend.appendChild(c);
+  });
+  $('#timeline').appendChild(legend);
+  const eq=el('p','eqnote',`The holdout is <b>${D.horizon} days</b> and the real forecast window is <b>${D.test.days} days</b> &mdash; the same length by construction, not by coincidence.`);
+  $('#timeline').appendChild(eq);
+})();
+
+$('#tllead').innerHTML=`The holdout is not a round number chosen for convenience: it is <b>${D.horizon} days</b> because the real forecast window in `+
+  `test.csv is ${D.horizon} days. Validating over a shorter window would flatter the result; a longer one would test a distance the business never has to forecast.`;
+(function(){
+  [['Fitting rows (to '+D.fit.max+')',n0(D.fit.rows)],
+   ['Holdout rows ('+D.hold.min+' onward)',n0(D.hold.rows)],
+   ['&nbsp;&nbsp;&mdash; open, would be scored',n0(D.hold.scored)],
+   ['&nbsp;&nbsp;&mdash; closed, excluded under the proposed rule',n0(D.hold.closed)],
+   ['Real forecast window (no Sales)',n0(D.test.rows)]
+  ].forEach(([k,v],i)=>{
+    const r=el('div','kv'+(i===0?' tot':''));
+    r.innerHTML=`<span class="k">${k}</span><span class="v2">${v}</span>`; $('#tlkv').appendChild(r);
+  });
+})();
+$('#tlrule').innerHTML=`<b>Not yet selected.</b> ${D.cutoff} follows mechanically from the horizon length, but no cutoff has been agreed. `+
+  `Note also that the holdout spans <b>${n0(D.hold.stores)} stores</b> while the real forecast window covers <b>${n0(D.test.stores)}</b> &mdash; `+
+  `whether validation should be restricted to those ${n0(D.test.stores)} is an open question below.`;
+
+/* ---------- random split diagram ---------- */
+(function(){
+  const N=48, W=560, cell=(W-6)/N, H=112;
+  const s=svg('svg',{viewBox:`0 0 ${W} ${H}`,role:'img',
+    'aria-label':'Two ways of splitting the same 48 days: chronological, and random'});
+  // deterministic pseudo-random holdout positions, for illustration
+  const rand=new Set(); let seed=7;
+  while(rand.size<10){ seed=(seed*1103515245+12345)%2147483648; rand.add(seed%N); }
+  const rows=[
+    {y:16, lab:'Chronological — valid', pick:i=>i>=N-10, ok:true},
+    {y:70, lab:'Random — invalid',      pick:i=>rand.has(i), ok:false},
+  ];
+  rows.forEach(r=>{
+    const t=svg('text',{x:0,y:r.y-6,class:'axtxt b'}); t.textContent=r.lab;
+    t.setAttribute('fill', r.ok?'var(--good-ink)':'var(--crit-ink)'); s.appendChild(t);
+    for(let i=0;i<N;i++){
+      const held=r.pick(i);
+      s.appendChild(svg('rect',{x:3+i*cell,y:r.y,width:cell-1.5,height:20,rx:1.5,
+        fill:held?(r.ok?'var(--warn)':'var(--crit)'):'var(--s1)',opacity:held?1:.30}));
+    }
+    const c=svg('text',{x:0,y:r.y+34,class:'axtxt'});
+    c.textContent=r.ok?'every held-out day comes after every training day'
+                      :'held-out days sit between training days — the model sees their future';
+    s.appendChild(c);
+  });
+  $('#splitdiag').appendChild(s);
+  const lg=el('div',null,
+    `<div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ink-2);margin-top:10px">`+
+    `<span><i style="display:inline-block;width:11px;height:11px;border-radius:2px;background:var(--s1);opacity:.3;margin-right:6px;vertical-align:-1px"></i>Training day</span>`+
+    `<span><i style="display:inline-block;width:11px;height:11px;border-radius:2px;background:var(--warn);margin-right:6px;vertical-align:-1px"></i>Held out, valid</span>`+
+    `<span><i style="display:inline-block;width:11px;height:11px;border-radius:2px;background:var(--crit);margin-right:6px;vertical-align:-1px"></i>Held out, leaking</span></div>`);
+  $('#splitdiag').appendChild(lg);
+})();
+
+[['1',`<b>It scores interpolation, not forecasting.</b> A randomly held-out Tuesday sits between the Monday and Wednesday the model trained on. `+
+      `Daily store sales move slowly, so guessing a day you already have both sides of is a far easier task than the one the business faces.`],
+ ['2',`<b>It never tests the real distance.</b> The live problem is ${D.horizon} days ahead with no observations in between. A random split has an `+
+      `average gap of roughly one day, so it measures a question nobody is asking.`],
+ ['3',`<b>It leaks through engineered features.</b> Any lag, rolling mean or per-store average computed across a randomly split panel mixes `+
+      `holdout days into training inputs, even when the raw rows look separated.`],
+ ['4',`<b>The result is optimistic and does not survive deployment.</b> The score improves, the forecast does not &mdash; which is the worst `+
+      `possible combination, because nothing signals the failure until it is live.`],
+].forEach(([n,t])=>{
+  const li=el('li'); li.innerHTML=`<span class="n">${n}</span><span>${t}</span>`; $('#reasons').appendChild(li);
+});
+
+/* ---------- metric ---------- */
+$('#metriclead').innerHTML=`Judged against the spread the holdout actually contains: median <b>${n0(D.hold_sales.median)}</b>, `+
+  `90th percentile <b>${n0(D.hold_sales.p90)}</b>, maximum <b>${n0(D.hold_sales.max)}</b> across ${n0(D.hold_sales.n)} scored rows.`;
+(function(){
+  const t=el('table');
+  t.innerHTML='<thead><tr><th>Metric</th><th>Status</th><th>Behaviour on this data</th></tr></thead>';
+  const tb=el('tbody');
+  [['MAE','<span class="chip ok">Primary</span>',
+    'Reads in the target&rsquo;s own units &mdash; an error of 700 means 700 of takings per store-day, which a planner can act on directly. Treats every store-day equally, so the estate&rsquo;s many mid-sized stores are not drowned out by a handful of very large ones.'],
+   ['RMSE','<span class="chip prop">Secondary, open</span>',
+    `Squares the error, so the long right tail out to ${n0(D.hold_sales.max)} dominates the score. Useful as a diagnostic for large individual misses; not agreed as a headline number.`],
+   ['RMSPE / MAPE','<span class="chip bad">Not used</span>',
+    `Percentage errors are undefined at zero and explode near it. Train contains ${n0(D.all.zero)} zero-sales rows, so a percentage metric would need those rows excluded before it could be computed at all &mdash; the exclusion, not the model, would drive the number.`],
+  ].forEach(([m,st,b])=>{
+    const tr=el('tr');
+    tr.innerHTML=`<td class="mono" style="font-weight:650">${m}</td><td>${st}</td><td style="color:var(--ink-2)">${b}</td>`;
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb); $('#metrictbl').appendChild(t);
+})();
+$('#metricrule').innerHTML=`<b>MAE is primary because it is the one number that converts straight into money per store per day</b> &mdash; `+
+  `the unit a stock or staffing decision is actually made in. Every model reported at Stage 4 must show MAE on this split beside at least one `+
+  `naive baseline computed the same way.`;
+
+/* ---------- closed days ---------- */
+(function(){
+  [['Holdout rows',n0(D.hold.rows),true],
+   ['Open &mdash; scored',n0(D.hold.scored),false],
+   ['Closed &mdash; predicted 0, excluded from score',n0(D.hold.closed),false],
+   ['Open but zero takings (scored as-is)',n0(D.hold.open_zero),false],
+  ].forEach(([k,v,tot])=>{
+    const r=el('div','kv'+(tot?' tot':''));
+    r.innerHTML=`<span class="k">${k}</span><span class="v2">${v}</span>`; $('#closedkv').appendChild(r);
+  });
+})();
+$('#closedrule').innerHTML=`<b>Proposed rule.</b> Where <span class="mono">Open = 0</span>, predict exactly 0 and leave the row out of the score. `+
+  `Closed days are published ahead, and <span class="mono">Open</span> is supplied for every row of the forecast window, so a closure is a known `+
+  `fact rather than something to be predicted.`;
+$('#closednote').innerHTML=`Scoring closed rows instead would hand the model ${n0(D.hold.closed)} free exact answers in the holdout alone, `+
+  `pulling MAE down by roughly ${Math.round(100*D.hold.closed/D.hold.rows)}% for no forecasting skill whatsoever. That is why this rule has to be `+
+  `settled before any two runs are compared. Separately, <b>${D.test_open_blank} rows in the real forecast window have a blank `+
+  `<span class="mono">Open</span></b> and still need a stated rule of their own.`;
+
+/* ---------- excluded ---------- */
+(function(){
+  const t=el('table');
+  t.innerHTML='<thead><tr><th>Column</th><th>Why it is excluded</th></tr></thead>';
+  const tb=el('tbody');
+  [['Customers','Present in train, absent from test. A same-day measurement, not a published plan &mdash; on any future date nobody knows it. Using it would require forecasting footfall first, a second problem as hard as the first.'],
+   ['Sales','The target. Admissible only as a lag or rolling figure whose window ends at or before the cutoff.'],
+   ['Id','A submission row key carrying no information about demand.'],
+  ].forEach(([c,w])=>{
+    const tr=el('tr');
+    tr.innerHTML=`<td class="mono" style="font-weight:650">${c}</td><td style="color:var(--ink-2)">${w}</td>`;
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb); $('#excltbl').appendChild(t);
+})();
+$('#exclrule').innerHTML=`<b>Customers stays out.</b> It correlates strongly with Sales and sits directly beside it in train.csv, which is exactly `+
+  `what makes it dangerous: a model using it validates beautifully and cannot be run on a single future date. The same test applies to every `+
+  `engineered feature &mdash; state where its value comes from on a date inside the forecast window.`;
+
+/* ---------- open questions ---------- */
+[[`<b>Sign off the split cutoff.</b> ${D.cutoff} is proposed on the grounds that the holdout must match the ${D.horizon}-day horizon. It has not been chosen.`],
+ [`<b>Holdout store scope.</b> The proposed window covers ${n0(D.hold.stores)} stores; the real forecast window covers ${n0(D.test.stores)}. Validating on stores that are out of forecast scope may not reflect the live task.`],
+ [`<b>Secondary metric.</b> MAE is primary. Whether RMSE is reported alongside it, and whether any per-store normalisation is used, is open.`],
+ [`<b>The ${D.test_open_blank} blank <span class="mono">Open</span> values</b> in the forecast window need a stated rule &mdash; treat as open, carry the store&rsquo;s last known status, or infer from the weekday pattern.`],
+ [`<b>Rolling-origin validation.</b> A single holdout gives one number. Whether to add walk-forward origins for a stability estimate is open.`],
+].forEach(([t])=>{ const li=el('li'); li.innerHTML=t; $('#openq').appendChild(li); });
+
+$('#foot').innerHTML=`<b>Stage 3 is design only &mdash; no model has been fitted, no baseline computed, and no forecast produced.</b> `+
+  `The target, grain, primary metric and excluded columns are settled; the split cutoff and the closed-day rule are proposed and awaiting `+
+  `sign-off. Once those are agreed, the next step is a naive baseline &mdash; seasonal naive and per-store weekday median &mdash; scored on this `+
+  `split with MAE, which every later model must be compared against.`;
+</script>
