@@ -1,4 +1,4 @@
-<title>Validation Design</title>
+<title>Baseline Forecasts</title>
 <style>
   :root {
     color-scheme: light;
@@ -78,6 +78,34 @@
   .axtxt { font-size:10.5px; fill:var(--ink-muted); font-variant-numeric:tabular-nums; }
   .axtxt.b { font-weight:650; fill:var(--ink-2); }
 
+  .legend { display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--ink-2); margin-top:10px; }
+  .legend i { width:11px; height:11px; border-radius:2px; display:inline-block; margin-right:6px; vertical-align:-1px; }
+  #tip { position:fixed; pointer-events:none; opacity:0; transition:opacity .1s;
+    background:var(--surface); border:1px solid var(--border); border-radius:5px; padding:8px 11px;
+    font-size:12px; box-shadow:0 4px 14px rgba(0,0,0,.16); z-index:99;
+    font-variant-numeric:tabular-nums; max-width:250px; }
+  #tip .t1 { font-weight:650; margin-bottom:3px; }
+  #tip .t2 { color:var(--ink-2); }
+
+  .sectionrule { display:flex; align-items:center; gap:14px; margin:26px 0 16px; }
+  .sectionrule::before, .sectionrule::after { content:""; height:1px; background:var(--grid); flex:1; }
+  .sectionrule span { font-size:11px; font-weight:650; letter-spacing:0.1em; text-transform:uppercase; color:var(--ink-muted); }
+
+  /* baseline comparison bars */
+  .blrow { display:grid; grid-template-columns:170px 1fr auto; gap:12px; align-items:center; padding:7px 0; }
+  .blrow .nm { font-size:12.5px; }
+  .blrow .tr { background:var(--surface-2); border-radius:3px; height:20px; overflow:hidden; }
+  .blrow .fl { height:100%; border-radius:3px; background:var(--ink-muted); }
+  .blrow.win .fl { background:var(--good); }
+  .blrow.win .nm { font-weight:650; }
+  .blrow .vl { font-size:13px; font-weight:650; font-variant-numeric:tabular-nums; min-width:62px; text-align:right; }
+
+  .hero { display:flex; align-items:baseline; gap:10px; margin:2px 0 4px; }
+  .hero .big { font-size:44px; font-weight:600; letter-spacing:-0.03em; line-height:1; }
+  .hero .unit { font-size:14px; color:var(--ink-2); }
+  .heroname { font-size:13px; font-weight:650; margin-top:8px; }
+  .herosub { font-size:12.5px; color:var(--ink-2); margin-top:3px; }
+
   .tlseg { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:16px; }
   .tlseg .seg { display:grid; grid-template-columns:auto 1fr; gap:10px; align-items:start;
                 border:1px solid var(--border); border-radius:5px; padding:10px 13px; background:var(--surface-2); }
@@ -127,16 +155,60 @@
 <div class="wrap">
   <div class="head">
     <div>
-      <h1>Validation Design</h1>
-      <p class="sub">How a forecast will be tested before one is built &mdash; the split, the metric, and the rules for days that cannot be scored. Settling this first is what stops a good-looking number from being an artefact of how it was measured.</p>
+      <h1>Baseline Forecasts</h1>
+      <p class="sub">Three naive rules, scored on the approved holdout, establishing the number any model has to beat. The validation design they were measured under is documented below.</p>
     </div>
-    <div class="stage">Stage 3 &middot; Design only &middot; No model fitted</div>
+    <div class="stage">Stage 4 &middot; Baselines &middot; No model fitted</div>
   </div>
 
   <div class="gates" id="gates"></div>
 
+  <div class="duo">
+    <div class="card">
+      <h2>Baseline accuracy on the holdout <span class="chip ok" id="blchip"></span></h2>
+      <p class="lead" id="bllead"></p>
+      <div id="blchart"></div>
+      <div id="bltbl" style="margin-top:16px"></div>
+    </div>
+    <div class="card" id="bestcard">
+      <h2>Benchmark to beat <span class="chip ok">Selected</span></h2>
+      <p class="lead">The strongest naive rule. Every model reported at Stage 5 must show MAE on this same split, beside this number.</p>
+      <div id="besthero"></div>
+      <p class="rule" id="bestwhy"></p>
+      <p class="note" id="leaknote"></p>
+    </div>
+  </div>
+
   <div class="card full">
-    <h2>Split timeline <span class="chip prop" id="tlchip">Cutoff proposed, not selected</span></h2>
+    <h2>Worked example &mdash; one store across the holdout <span class="chip ok" id="exchip"></span></h2>
+    <p class="lead" id="exlead"></p>
+    <div id="exchart"></div>
+    <div class="legend" id="exlegend"></div>
+    <p class="rule" id="extake"></p>
+  </div>
+
+  <div class="duo">
+    <div class="card">
+      <h2>Accuracy by store <span class="chip ok" id="pschip"></span></h2>
+      <p class="lead" id="pslead"></p>
+      <div id="pschart"></div>
+      <div class="legend" id="pslegend"></div>
+      <p class="rule" id="pstake"></p>
+    </div>
+    <div class="card">
+      <h2>Open-day performance <span class="chip prop">Rule in force</span></h2>
+      <p class="lead">Only open days are scored. The comparison below shows what including closed days would do to the headline number.</p>
+      <div id="odkv"></div>
+      <p class="rule warnl" id="odrule"></p>
+      <div style="margin-top:16px" id="dowchart"></div>
+      <p class="note" id="dowtake"></p>
+    </div>
+  </div>
+
+  <div class="sectionrule"><span>Validation design</span></div>
+
+  <div class="card full">
+    <h2>Split timeline <span class="chip ok" id="tlchip">Cutoff approved</span></h2>
     <p class="lead" id="tllead"></p>
     <div id="timeline"></div>
     <div id="tlkv" style="margin-top:16px"></div>
@@ -161,7 +233,7 @@
 
   <div class="duo">
     <div class="card">
-      <h2>Closed days &amp; zero sales <span class="chip prop">Rule proposed</span></h2>
+      <h2>Closed days &amp; zero sales <span class="chip prop">In force, unconfirmed</span></h2>
       <p class="lead">Closures are published in advance, so they are knowable rather than predictable. The rule decides which rows a score is even computed over.</p>
       <div id="closedkv"></div>
       <p class="rule warnl" id="closedrule"></p>
@@ -177,27 +249,40 @@
   </div>
 
   <div class="open-q full">
-    <h2>Open decisions before a baseline runs</h2>
+    <h2>Open decisions before a model runs</h2>
     <ol id="openq"></ol>
   </div>
 
   <div class="foot" id="foot"></div>
 </div>
+<div id="tip"><div class="t1"></div><div class="t2"></div></div>
 
 <script>
-const D = {"horizon":48,"train":{"min":"2013-01-01","max":"2015-07-31","days":942},"test":{"min":"2015-08-01","max":"2015-09-17","days":48,"rows":41088,"stores":856},"cutoff":"2015-06-14","fit":{"rows":963689,"days":894,"stores":1115,"open":798508,"closed":165181,"zero":165235,"open_zero":54,"scored":798454,"min":"2013-01-01","max":"2015-06-13"},"hold":{"rows":53520,"days":48,"stores":1115,"open":45884,"closed":7636,"zero":7636,"open_zero":0,"scored":45884,"min":"2015-06-14","max":"2015-07-31"},"hold_sales":{"n":45884,"min":569.0,"p10":3947.0,"median":6564.0,"p90":10958.0,"max":41551.0,"mean":7145.4},"test_open_blank":11,"all":{"rows":1017209,"days":942,"stores":1115,"open":844392,"closed":172817,"zero":172871,"open_zero":54,"scored":844338,"closed_by_sunday":141137}};
+const D = {"horizon":48,"train":{"min":"2013-01-01","max":"2015-07-31","days":942},"test":{"min":"2015-08-01","max":"2015-09-17","days":48,"rows":41088,"stores":856},"cutoff":"2015-06-14","fit":{"rows":963689,"days":894,"stores":1115,"open":798508,"closed":165181,"zero":165235,"open_zero":54,"scored":798454,"min":"2013-01-01","max":"2015-06-13"},"hold":{"rows":53520,"days":48,"stores":1115,"open":45884,"closed":7636,"zero":7636,"open_zero":0,"scored":45884,"min":"2015-06-14","max":"2015-07-31"},"hold_sales":{"n":45884,"min":569.0,"p10":3947.0,"median":6564.0,"p90":10958.0,"max":41551.0,"mean":7145.4},"test_open_blank":11,"all":{"rows":1017209,"days":942,"stores":1115,"open":844392,"closed":172817,"zero":172871,"open_zero":54,"scored":844338,"closed_by_sunday":141137},"bl":{"results":[{"key":"last_weekday","name":"Same weekday, last week","description":"Each store's takings on the most recent trading occurrence of that weekday before the cutoff, held flat across the horizon.","mae":1466.1,"rmse":2083.5,"n":45884,"mae_pct":20.5},{"key":"recent_avg","name":"Recent 28-day average","description":"Mean takings over each store's last 28 trading days before the cutoff, applied flat to every day of the horizon. Carries no weekday shape.","mae":1427.8,"rmse":1890.2,"n":45884,"mae_pct":20.0},{"key":"store_weekday","name":"Store weekday average","description":"Each store's average takings for that weekday over the whole fitting period. The rule a planner would reach for by hand.","mae":1259.3,"rmse":1666.0,"n":45884,"mae_pct":17.6}],"best":"store_weekday","hold_mean":7145.4,"leak":{"name":"Same weekday, in-window actuals","mae":2198.0},"closed_effect":{"mae_open":1259.3,"mae_all":1079.6,"n_open":45884,"n_all":53520},"by_store":[[2621,533],[2735,566],[2784,790],[2897,640],[2938,799],[3093,480],[3110,667],[3161,402],[3167,514],[3175,949],[3189,611],[3217,569],[3261,501],[3262,533],[3302,541],[3306,284],[3339,692],[3358,567],[3369,672],[3397,679],[3397,541],[3458,667],[3662,510],[3673,660],[3682,730],[3704,742],[3705,736],[3711,407],[3717,663],[3717,495],[3783,923],[3785,606],[3796,978],[3802,740],[3811,756],[3814,616],[3835,565],[3840,1308],[3840,486],[3874,695],[3878,1392],[3887,698],[3898,776],[3953,590],[3973,806],[3979,524],[3985,663],[3987,813],[3987,688],[3997,547],[4021,836],[4028,743],[4036,663],[4043,915],[4059,893],[4072,713],[4073,665],[4081,743],[4092,773],[4096,786],[4102,1329],[4103,744],[4139,743],[4141,846],[4144,747],[4158,980],[4163,701],[4183,890],[4190,550],[4198,938],[4207,1001],[4209,1044],[4213,888],[4219,547],[4237,729],[4255,693],[4308,676],[4311,672],[4337,747],[4364,730],[4377,605],[4379,651],[4387,678],[4387,555],[4391,768],[4393,838],[4394,710],[4416,689],[4423,670],[4430,760],[4434,553],[4436,825],[4436,589],[4437,1293],[4447,988],[4454,850],[4477,876],[4480,632],[4483,662],[4493,739],[4499,904],[4501,853],[4525,600],[4547,658],[4555,1109],[4555,375],[4574,851],[4579,1252],[4581,661],[4582,946],[4595,1146],[4597,690],[4599,738],[4614,952],[4617,880],[4618,615],[4633,523],[4647,1177],[4653,1179],[4661,961],[4674,879],[4674,717],[4682,1265],[4693,627],[4693,745],[4698,614],[4702,1073],[4704,788],[4704,798],[4710,898],[4712,851],[4717,451],[4727,1079],[4739,1080],[4740,853],[4742,659],[4750,583],[4751,640],[4758,867],[4763,839],[4767,836],[4778,559],[4784,677],[4785,1301],[4792,1126],[4799,657],[4817,1203],[4831,576],[4833,975],[4839,791],[4848,844],[4854,569],[4869,1060],[4888,1187],[4903,882],[4910,727],[4924,753],[4933,953],[4934,768],[4934,989],[4935,1081],[4942,658],[4963,1766],[4965,1031],[4970,830],[4970,1003],[4975,883],[4987,911],[4990,619],[4992,1079],[4994,958],[4994,830],[4995,1098],[4998,689],[5003,787],[5009,681],[5012,964],[5020,1300],[5026,836],[5027,771],[5039,1247],[5043,1538],[5043,1001],[5055,966],[5060,829],[5060,852],[5074,890],[5090,1129],[5097,891],[5099,926],[5101,1393],[5105,682],[5106,921],[5117,960],[5119,908],[5122,732],[5124,774],[5129,931],[5136,1144],[5137,826],[5139,910],[5143,599],[5143,677],[5147,996],[5154,766],[5159,1176],[5161,707],[5162,973],[5162,1271],[5165,847],[5166,628],[5180,975],[5181,1165],[5197,823],[5211,1188],[5212,689],[5216,1137],[5231,990],[5249,1137],[5253,823],[5261,853],[5262,1256],[5265,709],[5266,986],[5270,828],[5271,913],[5272,739],[5277,1007],[5278,1063],[5283,787],[5288,691],[5289,1066],[5298,1135],[5309,1007],[5322,1044],[5330,906],[5330,917],[5337,713],[5339,1123],[5345,1228],[5347,925],[5350,763],[5350,795],[5356,660],[5361,1070],[5372,1567],[5376,812],[5379,941],[5381,1251],[5385,688],[5385,1107],[5390,919],[5391,873],[5398,1148],[5406,1126],[5413,1002],[5413,793],[5419,644],[5436,1110],[5436,1217],[5436,543],[5446,1049],[5449,811],[5454,1525],[5455,1011],[5456,1397],[5456,1231],[5468,675],[5469,920],[5473,915],[5475,1191],[5478,867],[5479,1743],[5484,900],[5495,1129],[5499,726],[5500,910],[5501,1024],[5503,935],[5503,1466],[5504,968],[5504,1076],[5505,777],[5506,1058],[5510,870],[5516,1112],[5518,871],[5519,1238],[5523,773],[5527,1137],[5532,969],[5535,1201],[5537,856],[5546,816],[5548,716],[5574,1148],[5575,1069],[5580,1206],[5591,818],[5598,879],[5599,788],[5612,888],[5615,1244],[5620,1147],[5622,1233],[5625,854],[5628,1089],[5632,1193],[5637,970],[5643,1090],[5648,1452],[5648,1057],[5654,1096],[5657,1174],[5660,1241],[5666,1025],[5666,1398],[5682,1237],[5690,992],[5693,1107],[5696,933],[5696,1072],[5707,1041],[5710,1341],[5711,917],[5715,878],[5719,1158],[5726,977],[5736,910],[5740,1045],[5744,1082],[5747,901],[5763,1398],[5764,861],[5768,869],[5768,1137],[5776,1259],[5776,1360],[5778,1242],[5786,1150],[5792,1119],[5801,929],[5807,1298],[5808,700],[5810,882],[5810,506],[5812,1032],[5813,1568],[5817,1140],[5826,1559],[5827,1472],[5832,907],[5838,1390],[5853,762],[5856,1149],[5857,882],[5858,710],[5862,665],[5883,932],[5883,1895],[5890,1498],[5891,1079],[5898,1025],[5904,900],[5906,850],[5907,1156],[5910,1205],[5914,919],[5925,784],[5939,1225],[5940,1320],[5944,846],[5945,817],[5945,819],[5955,897],[5962,1062],[5963,1495],[5972,1555],[5973,1158],[5977,1183],[5980,1614],[5990,1198],[5993,1073],[5995,773],[6003,1064],[6005,1457],[6009,1132],[6018,838],[6018,1146],[6023,1069],[6024,992],[6026,1028],[6027,907],[6030,893],[6035,1123],[6043,1218],[6045,1243],[6053,939],[6062,902],[6069,674],[6077,966],[6078,1301],[6078,1218],[6079,1014],[6081,717],[6087,1990],[6089,1004],[6092,1082],[6092,1309],[6093,1188],[6093,1663],[6098,1028],[6110,1278],[6116,1294],[6119,1096],[6125,1174],[6125,1440],[6133,734],[6137,971],[6141,1310],[6154,1153],[6158,840],[6159,1064],[6160,1055],[6176,992],[6183,922],[6199,1454],[6200,955],[6201,789],[6206,1172],[6208,1097],[6217,1176],[6219,1305],[6223,1076],[6224,1300],[6227,1089],[6228,627],[6235,1127],[6242,1543],[6246,847],[6249,1179],[6259,1068],[6260,1160],[6260,1270],[6261,972],[6264,972],[6266,700],[6278,1519],[6279,953],[6285,1313],[6285,1345],[6299,814],[6299,1123],[6302,922],[6308,529],[6312,930],[6313,1213],[6318,1057],[6324,1172],[6327,998],[6331,1193],[6333,1232],[6342,901],[6345,1297],[6346,1022],[6347,920],[6351,989],[6359,1595],[6361,1394],[6361,1037],[6362,1348],[6368,1004],[6370,1135],[6377,981],[6380,1318],[6386,1168],[6387,860],[6393,1473],[6396,1371],[6403,1302],[6406,1193],[6413,1183],[6416,2175],[6417,1482],[6419,1325],[6421,1380],[6423,1299],[6428,903],[6432,1109],[6436,658],[6446,1203],[6448,886],[6449,1356],[6451,979],[6456,1446],[6460,847],[6467,884],[6468,1026],[6471,1145],[6472,1123],[6472,867],[6473,1199],[6486,1282],[6489,1344],[6496,1403],[6500,903],[6509,1480],[6513,1036],[6514,1180],[6525,1529],[6528,1107],[6536,1532],[6538,1741],[6540,1157],[6540,1147],[6559,1412],[6566,1034],[6567,1192],[6570,1132],[6572,875],[6591,1023],[6592,962],[6602,999],[6603,1185],[6605,1178],[6607,1125],[6621,942],[6625,978],[6627,1334],[6634,1109],[6637,987],[6640,1636],[6641,1181],[6644,719],[6646,1234],[6648,849],[6652,1137],[6656,1050],[6656,869],[6656,906],[6657,932],[6658,1150],[6660,1169],[6673,990],[6675,1401],[6676,1177],[6694,1002],[6700,795],[6704,1022],[6709,1127],[6710,1445],[6714,1443],[6718,2251],[6723,2073],[6724,1151],[6741,1197],[6744,1028],[6745,1407],[6760,1271],[6785,1391],[6788,1391],[6792,1335],[6799,1010],[6804,1262],[6809,1415],[6819,1270],[6823,997],[6825,946],[6825,1663],[6827,1174],[6828,1094],[6833,1233],[6833,981],[6834,1081],[6834,1573],[6841,1229],[6842,1020],[6846,1469],[6846,1175],[6850,1429],[6850,1252],[6859,1199],[6863,1283],[6864,1190],[6878,1466],[6879,1305],[6880,2112],[6888,1216],[6892,960],[6894,1542],[6897,1134],[6901,952],[6905,923],[6908,1309],[6916,1389],[6917,1291],[6924,955],[6926,828],[6927,1486],[6932,947],[6935,2242],[6945,1255],[6945,1260],[6951,1042],[6952,1462],[6954,1745],[6957,1267],[6958,1320],[6958,1234],[6973,1270],[6977,674],[6981,1148],[6998,1261],[7004,1303],[7020,1283],[7021,1235],[7024,1492],[7027,619],[7040,1268],[7050,1138],[7050,1721],[7053,1255],[7057,1770],[7057,644],[7058,988],[7066,1152],[7068,1042],[7083,1560],[7083,1105],[7089,1293],[7091,1191],[7093,1219],[7094,1363],[7094,1279],[7105,1167],[7115,895],[7118,1717],[7119,1372],[7120,1352],[7127,1114],[7134,1333],[7136,1392],[7137,1425],[7144,1516],[7144,1353],[7145,1112],[7151,1417],[7169,1439],[7174,1468],[7177,1605],[7189,1286],[7190,1586],[7194,1170],[7196,1119],[7196,1600],[7200,1372],[7203,1386],[7206,1527],[7209,1854],[7210,840],[7214,888],[7215,1447],[7218,1224],[7221,836],[7240,1101],[7246,1103],[7253,1426],[7255,1257],[7255,1062],[7257,1272],[7260,1307],[7261,1163],[7265,1130],[7265,1214],[7267,1443],[7268,952],[7268,1120],[7272,1272],[7273,1406],[7276,1350],[7277,1057],[7277,957],[7277,1307],[7288,1070],[7295,1579],[7305,3425],[7307,1155],[7309,1422],[7315,1145],[7316,1078],[7329,1646],[7334,1183],[7339,1256],[7343,1558],[7353,1377],[7360,1530],[7366,1224],[7372,1222],[7376,1358],[7379,1259],[7384,833],[7395,979],[7397,1339],[7399,1451],[7401,1510],[7402,1037],[7403,1200],[7406,1142],[7408,1562],[7420,1592],[7424,1607],[7430,1201],[7447,1171],[7463,1296],[7464,1125],[7473,1261],[7479,1552],[7482,1681],[7495,865],[7506,1040],[7507,1535],[7515,1096],[7516,1116],[7518,1203],[7519,1396],[7532,1047],[7537,1332],[7538,1161],[7557,1106],[7558,1894],[7562,1420],[7564,1218],[7566,1367],[7582,1377],[7586,895],[7590,1460],[7610,1348],[7614,1273],[7620,1494],[7624,1101],[7624,2390],[7628,1694],[7632,1157],[7641,1663],[7646,1604],[7653,1556],[7659,1326],[7660,938],[7661,1631],[7661,1567],[7662,1147],[7672,905],[7679,1107],[7689,1502],[7693,778],[7700,1434],[7713,1035],[7722,1109],[7728,1128],[7738,1522],[7739,1216],[7742,1206],[7744,1958],[7744,1439],[7763,1198],[7765,1474],[7770,1035],[7770,1063],[7771,1013],[7784,931],[7789,1587],[7793,1947],[7796,1499],[7818,1393],[7829,1798],[7829,1332],[7837,1591],[7847,1478],[7850,1370],[7856,1132],[7865,1032],[7868,1450],[7876,1442],[7877,1386],[7878,969],[7885,1487],[7889,1289],[7897,1610],[7900,1573],[7905,1404],[7918,1470],[7928,1510],[7932,1524],[7933,1417],[7934,2259],[7959,1242],[7976,1435],[7997,1230],[8000,1071],[8008,2026],[8010,1443],[8014,1395],[8028,1559],[8031,1337],[8032,2024],[8051,1601],[8055,2078],[8063,1122],[8064,1575],[8069,1394],[8073,1301],[8074,2549],[8079,2075],[8081,1147],[8083,1425],[8103,1633],[8108,1121],[8111,1176],[8122,1752],[8122,1443],[8125,1213],[8126,1564],[8140,1338],[8145,1543],[8151,1382],[8152,1561],[8155,1367],[8156,1391],[8159,1351],[8172,1282],[8175,732],[8176,2296],[8178,1565],[8191,1437],[8192,887],[8208,1595],[8212,1191],[8228,1323],[8229,1537],[8232,1475],[8236,2046],[8237,1449],[8248,1301],[8249,1729],[8252,1667],[8259,1683],[8259,1415],[8263,1201],[8269,1383],[8285,1214],[8289,1486],[8295,1177],[8304,1702],[8306,1201],[8338,1142],[8344,1504],[8346,1521],[8351,1531],[8352,2254],[8353,1728],[8356,1264],[8371,1343],[8374,1298],[8384,1234],[8384,1418],[8396,1188],[8400,1574],[8427,1337],[8432,2460],[8441,1470],[8448,1188],[8454,987],[8469,1363],[8483,2480],[8493,1299],[8496,1602],[8497,1478],[8517,1625],[8519,1130],[8531,1224],[8537,1519],[8538,1362],[8543,1294],[8559,1502],[8574,1339],[8581,1694],[8591,1300],[8595,1570],[8599,1405],[8609,1048],[8609,1945],[8617,1940],[8619,1382],[8621,1308],[8643,1658],[8645,1383],[8645,1676],[8649,1784],[8666,1315],[8669,1167],[8681,1589],[8682,1200],[8685,1490],[8714,1440],[8718,937],[8750,1186],[8753,1718],[8775,1606],[8779,1750],[8785,1907],[8786,1597],[8805,1626],[8811,2126],[8857,1884],[8874,1517],[8876,1211],[8883,1386],[8895,1733],[8900,1651],[8906,2011],[8910,1650],[8923,1233],[8925,1288],[8928,1184],[8959,1521],[8971,1529],[8977,1605],[8994,1208],[9001,1494],[9004,1518],[9010,1505],[9025,1203],[9027,2128],[9027,2077],[9058,1764],[9062,1517],[9072,1726],[9101,1297],[9108,1865],[9114,1435],[9132,1047],[9136,1993],[9177,1060],[9192,1149],[9197,1703],[9199,1634],[9217,1737],[9229,1504],[9231,2143],[9253,1761],[9265,1445],[9275,1687],[9288,1564],[9296,1610],[9317,1299],[9318,1242],[9322,2492],[9333,1462],[9341,1789],[9353,1670],[9383,1940],[9389,1565],[9401,2356],[9405,1742],[9416,1426],[9423,1368],[9424,1361],[9433,1521],[9445,1293],[9445,2084],[9451,1444],[9514,2122],[9525,1890],[9542,1976],[9565,1390],[9579,2011],[9586,1946],[9597,1824],[9605,1789],[9622,1809],[9627,1627],[9629,1130],[9631,1371],[9633,1367],[9670,1214],[9704,1106],[9723,2043],[9771,1351],[9777,1810],[9781,1163],[9781,2033],[9786,2118],[9793,1291],[9812,2252],[9849,1669],[9850,1321],[9874,1450],[9890,1551],[9938,1412],[9939,1687],[9944,1388],[9986,1254],[9998,1813],[10025,1332],[10029,1517],[10030,1372],[10067,1837],[10087,1135],[10089,1560],[10108,1219],[10126,1675],[10138,1197],[10180,2866],[10220,2721],[10225,2393],[10252,1569],[10274,1714],[10310,1736],[10343,1487],[10355,1687],[10371,1454],[10381,1892],[10392,1336],[10444,1898],[10454,1906],[10458,1460],[10489,2995],[10519,1768],[10535,2935],[10543,1003],[10581,1680],[10606,1565],[10648,1206],[10676,2240],[10754,2084],[10759,2211],[10800,1980],[10803,2506],[10811,1706],[10814,1119],[10835,1576],[10915,1361],[10918,2470],[10950,1558],[10962,1009],[10969,1902],[10987,1461],[10998,2133],[11020,1946],[11056,1950],[11077,1986],[11098,1545],[11214,1947],[11219,1498],[11256,1832],[11295,2475],[11362,2334],[11395,2504],[11465,2141],[11483,1476],[11494,3790],[11537,1721],[11548,1724],[11564,2235],[11651,852],[11671,2469],[11699,1329],[11711,1829],[11748,1523],[11782,1448],[12069,2212],[12082,2311],[12106,1459],[12130,1437],[12146,2146],[12148,2037],[12194,1546],[12198,1831],[12301,2702],[12414,1606],[12540,2069],[12570,1569],[12641,2395],[12871,1311],[13274,4636],[13320,3207],[13414,1783],[13646,2132],[13651,1884],[13669,2500],[13671,2600],[13812,2400],[13925,2669],[14371,2355],[14381,2414],[14394,2437],[14703,2522],[14787,2471],[14801,1070],[14880,1737],[15309,2237],[15321,5921],[15356,2200],[15639,3121],[16923,2018],[17088,1921],[17253,2825],[17359,2530],[17497,1458],[17971,2175],[19079,2658],[20536,3087],[21282,1775],[21295,2061],[22787,3067]],"store_summary":{"median":1191,"p10":730,"p90":1824,"worst":{"store":909,"mae":5921,"avg":15321},"sharpest":{"store":794,"mae":284,"avg":3306},"n":1115},"by_dow":[{"name":"Mon","mae":1953.7,"n":7796},{"name":"Tue","mae":1687.3,"n":7796},{"name":"Wed","mae":1146.9,"n":7796},{"name":"Thu","mae":980.4,"n":7794},{"name":"Fri","mae":1078.8,"n":7795},{"name":"Sat","mae":616.2,"n":6682},{"name":"Sun","mae":1278.2,"n":225}],"example":{"store":954,"avg":6745.0,"dates":["2015-06-14","2015-06-15","2015-06-16","2015-06-17","2015-06-18","2015-06-19","2015-06-20","2015-06-21","2015-06-22","2015-06-23","2015-06-24","2015-06-25","2015-06-26","2015-06-27","2015-06-28","2015-06-29","2015-06-30","2015-07-01","2015-07-02","2015-07-03","2015-07-04","2015-07-05","2015-07-06","2015-07-07","2015-07-08","2015-07-09","2015-07-10","2015-07-11","2015-07-12","2015-07-13","2015-07-14","2015-07-15","2015-07-16","2015-07-17","2015-07-18","2015-07-19","2015-07-20","2015-07-21","2015-07-22","2015-07-23","2015-07-24","2015-07-25","2015-07-26","2015-07-27","2015-07-28","2015-07-29","2015-07-30","2015-07-31"],"actual":[0.0,10566.0,8870.0,8546.0,6644.0,6659.0,5804.0,0.0,4622.0,4765.0,6069.0,5121.0,5276.0,6532.0,0.0,11827.0,12439.0,8144.0,6803.0,7216.0,4693.0,0.0,6993.0,5044.0,6058.0,4883.0,5501.0,6121.0,0.0,8919.0,7656.0,8115.0,6808.0,5614.0,6024.0,0.0,5198.0,4863.0,5164.0,5762.0,4406.0,3913.0,0.0,8380.0,7602.0,7395.0,6615.0,8916.0],"open":[0,1,1,1,1,1,1,0,1,1,1,1,1,1,0,1,1,1,1,1,1,0,1,1,1,1,1,1,0,1,1,1,1,1,1,0,1,1,1,1,1,1,0,1,1,1,1,1],"preds":{"last_weekday":[0.0,6116.0,5395.0,5799.0,5056.0,4466.0,5879.0,0.0,6116.0,5395.0,5799.0,5056.0,4466.0,5879.0,0.0,6116.0,5395.0,5799.0,5056.0,4466.0,5879.0,0.0,6116.0,5395.0,5799.0,5056.0,4466.0,5879.0,0.0,6116.0,5395.0,5799.0,5056.0,4466.0,5879.0,0.0,6116.0,5395.0,5799.0,5056.0,4466.0,5879.0,0.0,6116.0,5395.0,5799.0,5056.0,4466.0],"recent_avg":[0.0,6903.9,6903.9,6903.9,6903.9,6903.9,6903.9,0.0,6903.9,6903.9,6903.9,6903.9,6903.9,6903.9,0.0,6903.9,6903.9,6903.9,6903.9,6903.9,6903.9,0.0,6903.9,6903.9,6903.9,6903.9,6903.9,6903.9,0.0,6903.9,6903.9,6903.9,6903.9,6903.9,6903.9,0.0,6903.9,6903.9,6903.9,6903.9,6903.9,6903.9,0.0,6903.9,6903.9,6903.9,6903.9,6903.9],"store_weekday":[0.0,8441.1,6913.1,7174.4,6219.2,6404.5,6702.9,0.0,8441.1,6913.1,7174.4,6219.2,6404.5,6702.9,0.0,8441.1,6913.1,7174.4,6219.2,6404.5,6702.9,0.0,8441.1,6913.1,7174.4,6219.2,6404.5,6702.9,0.0,8441.1,6913.1,7174.4,6219.2,6404.5,6702.9,0.0,8441.1,6913.1,7174.4,6219.2,6404.5,6702.9,0.0,8441.1,6913.1,7174.4,6219.2,6404.5]},"mae":{"last_weekday":1694.8,"recent_avg":1526.0,"store_weekday":1407.1}}}};
 const $ = s => document.querySelector(s);
 const el = (t,c,h)=>{const e=document.createElement(t); if(c)e.className=c; if(h!==undefined)e.innerHTML=h; return e;};
 const SVGNS='http://www.w3.org/2000/svg';
 const svg=(t,a={})=>{const e=document.createElementNS(SVGNS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
 const n0=v=>Math.round(v).toLocaleString('en-US');
 
+const tip=$('#tip');
+function showTip(e,t1,t2){
+  tip.querySelector('.t1').textContent=t1; tip.querySelector('.t2').innerHTML=t2;
+  tip.style.opacity=1;
+  const r=tip.getBoundingClientRect();
+  let x=e.clientX+14,y=e.clientY-10;
+  if(x+r.width>innerWidth-8)x=e.clientX-r.width-14;
+  if(y+r.height>innerHeight-8)y=innerHeight-r.height-8;
+  tip.style.left=x+'px'; tip.style.top=y+'px';
+}
+const hideTip=()=>tip.style.opacity=0;
+
 /* ---------- decision gates ---------- */
 [['Target','ok','Confirmed','Sales','Daily revenue per store, in the source file&rsquo;s currency unit.'],
  ['Grain','ok','Confirmed','one store &times; one calendar day','Store + Date is unique in train and test, zero duplicates.'],
  ['Primary metric','ok','Specified','MAE','Mean absolute error, in the target&rsquo;s own units. Chosen by the business.'],
- ['Split cutoff','prop','Proposed',D.cutoff,`Last ${D.horizon} days of train held out, matching the ${D.horizon}-day horizon. Awaiting sign-off.`],
- ['Closed-day rule','prop','Proposed','predict 0, exclude from score','Closed rows are knowable in advance; scoring them would flatter the metric.'],
+ ['Split cutoff','ok','Approved',D.cutoff,`Last ${D.horizon} days of train held out, matching the ${D.horizon}-day horizon.`],
+ ['Closed-day rule','prop','Applied as proposed','predict 0, exclude from score','Used for every figure on this page. Never separately signed off &mdash; see open decisions.'],
  ['Customers','ok','Excluded','not a predictor','Train-only, same-day measurement. Locked at Stage 1 and not reopened.'],
 ].forEach(([name,cls,status,val,why])=>{
   const g=el('div','gate '+cls);
@@ -208,12 +293,210 @@ const n0=v=>Math.round(v).toLocaleString('en-US');
   g.appendChild(b); $('#gates').appendChild(g);
 });
 
+/* ================= STAGE 4 — baseline results ================= */
+const B=D.bl, BEST=B.results.find(r=>r.key===B.best);
+
+$('#blchip').textContent=`${n0(BEST.n)} scored rows`;
+$('#bllead').innerHTML=`Mean absolute error over every open day in the holdout, in the target&rsquo;s own units. `+
+  `A typical trading day in this window turns over <b>${n0(B.hold_mean)}</b>, so the percentages below are error as a share of an average day.`;
+
+(function(){
+  const mx=Math.max(...B.results.map(r=>r.mae));
+  B.results.slice().sort((a,b)=>a.mae-b.mae).forEach(r=>{
+    const win=r.key===B.best;
+    const row=el('div','blrow'+(win?' win':''));
+    row.innerHTML=`<span class="nm">${r.name}</span>`+
+      `<span class="tr"><span class="fl" style="width:${100*r.mae/mx}%"></span></span>`+
+      `<span class="vl">${n0(r.mae)}</span>`;
+    $('#blchart').appendChild(row);
+  });
+  const t=el('table');
+  t.innerHTML='<thead><tr><th>Rule</th><th class="num">MAE</th><th class="num">% of typical day</th><th class="num">RMSE</th></tr></thead>';
+  const tb=el('tbody');
+  B.results.slice().sort((a,b)=>a.mae-b.mae).forEach(r=>{
+    const tr=el('tr');
+    tr.innerHTML=`<td>${r.key===B.best?'<b>'+r.name+'</b>':r.name}</td>`+
+      `<td class="num">${n0(r.mae)}</td><td class="num">${r.mae_pct.toFixed(1)}%</td><td class="num">${n0(r.rmse)}</td>`;
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb); $('#bltbl').appendChild(t);
+})();
+
+(function(){
+  const h=el('div','hero');
+  h.innerHTML=`<span class="big">${n0(BEST.mae)}</span><span class="unit">MAE &middot; ${BEST.mae_pct.toFixed(1)}% of a typical day</span>`;
+  $('#besthero').appendChild(h);
+  $('#besthero').appendChild(el('div','heroname',BEST.name));
+  $('#besthero').appendChild(el('div','herosub',BEST.description));
+})();
+(function(){
+  const others=B.results.filter(r=>r.key!==B.best).sort((a,b)=>a.mae-b.mae);
+  $('#bestwhy').innerHTML=`<b>Why this one wins:</b> it averages many observations of the same store on the same weekday, so it cancels day-to-day `+
+    `noise that the other two carry. It beats ${others[0].name.toLowerCase()} by ${Math.round(100*(1-BEST.mae/others[0].mae))}% and `+
+    `${others[1].name.toLowerCase()} by ${Math.round(100*(1-BEST.mae/others[1].mae))}%. In business terms a typical store-day forecast is out by `+
+    `about ${n0(BEST.mae)} of takings &mdash; roughly ${BEST.mae_pct.toFixed(1)}% of the day.`;
+  $('#leaknote').innerHTML=`<b>A note on the tempting shortcut.</b> Predicting each day from the same store&rsquo;s actual takings seven days earlier &mdash; `+
+    `reading values from inside the forecast window, which is not possible in production &mdash; scores MAE ${n0(B.leak.mae)}. `+
+    `That is <b>worse</b>, not better: a single lagged day is noisier than an average of many. The leak is still disqualifying on principle, `+
+    `but here it would not even have flattered the result.`;
+})();
+
+/* ---------- worked example ---------- */
+(function(){
+  const e=B.example, N=e.dates.length;
+  $('#exchip').textContent='Store '+e.store;
+  $('#exlead').innerHTML=`Store ${e.store}, chosen because its average takings (<b>${n0(e.avg)}</b>) sit closest to the median store in the estate. `+
+    `Lines break on closed days, which are predicted as a known zero and left out of the score.`;
+  const W=1480,H=250,ML=54,MR=14,MT=14,MB=42;
+  const all=e.actual.concat(...Object.values(e.preds));
+  const yMax=Math.ceil(Math.max(...all)/2000)*2000;
+  const x=i=>ML+(i/(N-1))*(W-ML-MR);
+  const y=v=>MT+(1-v/yMax)*(H-MT-MB);
+  const s=svg('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':`Actual takings against three baseline forecasts for store ${e.store} across the holdout`});
+  for(let v=0;v<=yMax;v+=2000){
+    s.appendChild(svg('line',{x1:ML,x2:W-MR,y1:y(v),y2:y(v),class:'gl'}));
+    const t=svg('text',{x:ML-8,y:y(v)+3.5,class:'axtxt','text-anchor':'end'}); t.textContent=n0(v); s.appendChild(t);
+  }
+  // Shade the closed days rather than drawing a misleading dive to zero.
+  e.open.forEach((o,i)=>{
+    if(!o){
+      const w=(W-ML-MR)/(N-1);
+      s.appendChild(svg('rect',{x:x(i)-w/2,y:MT,width:w,height:H-MT-MB,fill:'var(--ink-muted)',opacity:.10}));
+    }
+  });
+  const draw=(vals,color,width)=>{
+    let d='',pen=false;
+    vals.forEach((v,i)=>{
+      if(!e.open[i]){ pen=false; return; }
+      d+=(pen?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1); pen=true;
+    });
+    s.appendChild(svg('path',{d:d,fill:'none',stroke:color,'stroke-width':width,'stroke-linejoin':'round','stroke-linecap':'round'}));
+  };
+  const cols={last_weekday:'var(--s2)',recent_avg:'var(--s3)',store_weekday:'var(--s1)'};
+  Object.keys(e.preds).forEach(k=>draw(e.preds[k],cols[k],1.5));
+  draw(e.actual,'var(--ink)',2.5);
+  s.appendChild(svg('line',{x1:ML,x2:W-MR,y1:H-MB,y2:H-MB,class:'base'}));
+  e.dates.forEach((d,i)=>{
+    if(i%7===0){
+      const t=svg('text',{x:x(i),y:H-MB+15,class:'axtxt','text-anchor':'middle'});
+      t.textContent=d.slice(5); s.appendChild(t);
+    }
+  });
+  const cross=svg('line',{x1:0,x2:0,y1:MT,y2:H-MB,stroke:'var(--ink-muted)','stroke-width':1,opacity:0});
+  s.appendChild(cross);
+  const hit=svg('rect',{x:ML,y:MT,width:W-ML-MR,height:H-MT-MB,fill:'transparent'});
+  hit.addEventListener('mousemove',ev=>{
+    const bb=s.getBoundingClientRect(), px=(ev.clientX-bb.left)/bb.width*W;
+    let i=Math.round((px-ML)/(W-ML-MR)*(N-1)); i=Math.max(0,Math.min(N-1,i));
+    cross.setAttribute('x1',x(i));cross.setAttribute('x2',x(i));cross.setAttribute('opacity',.5);
+    if(!e.open[i]){ showTip(ev,e.dates[i],'Closed &mdash; predicted 0, not scored'); return; }
+    showTip(ev,e.dates[i],`Actual <b>${n0(e.actual[i])}</b><br>`+
+      B.results.map(r=>`${r.name}: ${n0(e.preds[r.key][i])}`).join('<br>'));
+  });
+  hit.addEventListener('mouseleave',()=>{cross.setAttribute('opacity',0);hideTip();});
+  s.appendChild(hit);
+  $('#exchart').appendChild(s);
+
+  const lg=$('#exlegend');
+  lg.appendChild(el('span',null,`<i style="background:var(--ink)"></i>Actual`));
+  B.results.forEach(r=>lg.appendChild(el('span',null,
+    `<i style="background:${cols[r.key]}"></i>${r.name} <span style="color:var(--ink-muted)">MAE ${n0(e.mae[r.key])}</span>`)));
+
+  $('#extake').innerHTML=`<b>What to look for:</b> all three rules track the weekly rhythm, and all three miss the same peaks &mdash; `+
+    `the days this store trades well above its own norm are exactly where a naive rule has nothing to say. `+
+    `Closing that gap is what a model has to earn its keep on.`;
+})();
+
+/* ---------- accuracy by store ---------- */
+(function(){
+  const pts=B.by_store, ss=B.store_summary;
+  $('#pschip').textContent=n0(ss.n)+' stores';
+  $('#pslead').innerHTML=`Each dot is one store: its average takings on a holdout day against its own MAE under the selected rule. `+
+    `Median store MAE is <b>${n0(ss.median)}</b>.`;
+  const W=560,H=260,ML=48,MR=12,MT=12,MB=36;
+  const xMax=Math.ceil(Math.max(...pts.map(p=>p[0]))/5000)*5000;
+  const yMax=Math.ceil(Math.max(...pts.map(p=>p[1]))/2000)*2000;
+  const X=v=>ML+(v/xMax)*(W-ML-MR), Y=v=>MT+(1-v/yMax)*(H-MT-MB);
+  const s=svg('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Store average takings against store forecast error'});
+  for(let v=0;v<=yMax;v+=2000){
+    s.appendChild(svg('line',{x1:ML,x2:W-MR,y1:Y(v),y2:Y(v),class:'gl'}));
+    const t=svg('text',{x:ML-7,y:Y(v)+3.5,class:'axtxt','text-anchor':'end'}); t.textContent=n0(v); s.appendChild(t);
+  }
+  // Guide: what a constant percentage error would look like.
+  const pct=BEST.mae_pct/100;
+  s.appendChild(svg('line',{x1:X(0),y1:Y(0),x2:X(xMax),y2:Y(xMax*pct),
+    stroke:'var(--s2)','stroke-width':1.5,opacity:.8}));
+  pts.forEach(([a,m])=>{
+    const c=svg('circle',{cx:X(a),cy:Y(Math.min(m,yMax)),r:2.4,fill:'var(--s1)',opacity:.42});
+    s.appendChild(c);
+  });
+  s.appendChild(svg('line',{x1:ML,x2:W-MR,y1:H-MB,y2:H-MB,class:'base'}));
+  [0,.25,.5,.75,1].forEach(f=>{
+    const t=svg('text',{x:X(f*xMax),y:H-MB+15,class:'axtxt','text-anchor':f===0?'start':f===1?'end':'middle'});
+    t.textContent=n0(f*xMax); s.appendChild(t);
+  });
+  const xl=svg('text',{x:(ML+W-MR)/2,y:H-MB+31,class:'axtxt','text-anchor':'middle'});
+  xl.textContent='average takings per open day'; s.appendChild(xl);
+  $('#pschart').appendChild(s);
+  $('#pslegend').innerHTML=`<span><i style="background:var(--s1);opacity:.6"></i>One store</span>`+
+    `<span><i style="background:var(--s2)"></i>Constant ${BEST.mae_pct.toFixed(1)}% error</span>`;
+  $('#pstake').innerHTML=`<b>Error scales with size.</b> Most stores sit near the ${BEST.mae_pct.toFixed(1)}% line, so the naive rule is roughly `+
+    `proportional rather than uniformly good: the middle 80% of stores fall between MAE ${n0(ss.p10)} and ${n0(ss.p90)}. `+
+    `Store ${ss.worst.store} is the hardest at ${n0(ss.worst.mae)} on ${n0(ss.worst.avg)} a day; store ${ss.sharpest.store} the easiest at `+
+    `${n0(ss.sharpest.mae)} on ${n0(ss.sharpest.avg)}. Safety stock set as a flat percentage would be far too loose for some sites and too tight for others.`;
+})();
+
+/* ---------- open-day performance ---------- */
+(function(){
+  const c=B.closed_effect;
+  [['Holdout rows scored (open only)',n0(c.n_open),true],
+   ['MAE on open days &mdash; the reported figure',n0(c.mae_open),false],
+   ['Rows if closed days were included',n0(c.n_all),false],
+   ['MAE if closed days were scored',n0(c.mae_all),false],
+  ].forEach(([k,v,tot])=>{
+    const r=el('div','kv'+(tot?' tot':''));
+    r.innerHTML=`<span class="k">${k}</span><span class="v2">${v}</span>`; $('#odkv').appendChild(r);
+  });
+  const drop=Math.round(100*(1-c.mae_all/c.mae_open));
+  $('#odrule').innerHTML=`<b>The rule is doing real work.</b> Scoring the ${n0(c.n_all-c.n_open)} closed days as well would drop MAE from `+
+    `${n0(c.mae_open)} to ${n0(c.mae_all)} &mdash; a ${drop}% improvement bought entirely with free exact zeros, not forecasting skill. `+
+    `Any model compared against this benchmark must be scored the same way.`;
+
+  const w=B.by_dow, W=520,H=132,ML=44,MR=10,MT=10,MB=32;
+  const yMax=Math.ceil(Math.max(...w.map(d=>d.mae))/500)*500;
+  const s=svg('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Forecast error by day of week'});
+  for(let v=0;v<=yMax;v+=1000){
+    const yy=H-MB-(v/yMax)*(H-MT-MB);
+    s.appendChild(svg('line',{x1:ML,x2:W-MR,y1:yy,y2:yy,class:'gl'}));
+    const t=svg('text',{x:ML-7,y:yy+3.5,class:'axtxt','text-anchor':'end'}); t.textContent=n0(v); s.appendChild(t);
+  }
+  const bw=(W-ML-MR)/w.length;
+  w.forEach((d,i)=>{
+    const h=(d.mae/yMax)*(H-MT-MB), x0=ML+i*bw+bw*0.2, bwid=bw*0.6;
+    const thin=d.n<1000;
+    const r=svg('rect',{x:x0,y:H-MB-h,width:bwid,height:h,rx:2,
+      fill:thin?'var(--ink-muted)':'var(--s1)',opacity:thin?.45:1});
+    r.addEventListener('mousemove',ev=>showTip(ev,d.name,`MAE ${n0(d.mae)}<br>${n0(d.n)} scored rows`+
+      (thin?'<br><b>Few open days &mdash; not comparable</b>':'')));
+    r.addEventListener('mouseleave',hideTip);
+    s.appendChild(r);
+    const t=svg('text',{x:x0+bwid/2,y:H-MB+14,class:'axtxt','text-anchor':'middle'}); t.textContent=d.name; s.appendChild(t);
+  });
+  s.appendChild(svg('line',{x1:ML,x2:W-MR,y1:H-MB,y2:H-MB,class:'base'}));
+  $('#dowchart').appendChild(s);
+  const wk=w.filter(d=>d.n>=1000);
+  const hi=wk.reduce((a,b)=>a.mae>b.mae?a:b), lo=wk.reduce((a,b)=>a.mae<b.mae?a:b);
+  $('#dowtake').innerHTML=`Error is not spread evenly across the week: ${hi.name} is the hardest day at MAE ${n0(hi.mae)} and ${lo.name} the `+
+    `easiest at ${n0(lo.mae)}. ${hi.name} is also the busiest trading day, so the rule misses most where the money is. Sunday is shown muted &mdash; `+
+    `only ${n0(w[6].n)} open days fall in the holdout.`;
+})();
+
 /* ---------- timeline ---------- */
 (function(){
   const W=1480,H=96,ML=8,MR=8,MT=30,bandH=36;
   const total=D.fit.days+D.hold.days+D.test.days;
   const s=svg('svg',{viewBox:`0 0 ${W} ${H}`,role:'img',
-    'aria-label':'Timeline showing the fitting period, the proposed holdout, and the real forecast window'});
+    'aria-label':'Timeline showing the fitting period, the approved holdout, and the real forecast window'});
   const segs=[
     {d:D.fit.days, c:'var(--s1)', op:1,   lab:'Fitting data', ink:'#fff'},
     {d:D.hold.days,c:'var(--warn)',op:1,  lab:'Holdout',      ink:'#0b0b0b'},
@@ -234,7 +517,7 @@ const n0=v=>Math.round(v).toLocaleString('en-US');
   const cx=ML+(D.fit.days/total)*(W-ML-MR);
   s.appendChild(svg('line',{x1:cx,x2:cx,y1:MT-12,y2:MT+bandH+6,stroke:'var(--warn-ink)','stroke-width':1.5}));
   const ct=svg('text',{x:cx-8,y:MT-17,class:'axtxt b','text-anchor':'end'});
-  ct.textContent=`proposed cutoff ${D.cutoff}`; ct.setAttribute('fill','var(--warn-ink)'); s.appendChild(ct);
+  ct.textContent=`cutoff ${D.cutoff}`; ct.setAttribute('fill','var(--warn-ink)'); s.appendChild(ct);
   const a=svg('text',{x:ML,y:MT+bandH+18,class:'axtxt','text-anchor':'start'});
   a.textContent=D.fit.min; s.appendChild(a);
   const b=svg('text',{x:W-MR,y:MT+bandH+18,class:'axtxt','text-anchor':'end'});
@@ -244,7 +527,7 @@ const n0=v=>Math.round(v).toLocaleString('en-US');
   // Segment detail goes in an HTML legend, where it cannot collide.
   const legend=el('div','tlseg');
   [[ 'Fitting data','var(--s1)',1,`${D.fit.min} → ${D.fit.max}`,`${D.fit.days} days · ${n0(D.fit.rows)} rows`,''],
-   [ 'Holdout','var(--warn)',1,`${D.hold.min} → ${D.hold.max}`,`${D.hold.days} days · ${n0(D.hold.rows)} rows`,'Proposed'],
+   [ 'Holdout','var(--warn)',1,`${D.hold.min} → ${D.hold.max}`,`${D.hold.days} days · ${n0(D.hold.rows)} rows`,'Approved'],
    [ 'Forecast window','var(--s2)',.35,`${D.test.min} → ${D.test.max}`,`${D.test.days} days · ${n0(D.test.rows)} rows`,'No Sales']
   ].forEach(([name,col,op,range,size,tag])=>{
     const c=el('div','seg');
@@ -264,16 +547,16 @@ $('#tllead').innerHTML=`The holdout is not a round number chosen for convenience
   [['Fitting rows (to '+D.fit.max+')',n0(D.fit.rows)],
    ['Holdout rows ('+D.hold.min+' onward)',n0(D.hold.rows)],
    ['&nbsp;&nbsp;&mdash; open, would be scored',n0(D.hold.scored)],
-   ['&nbsp;&nbsp;&mdash; closed, excluded under the proposed rule',n0(D.hold.closed)],
+   ['&nbsp;&nbsp;&mdash; closed, excluded from the score',n0(D.hold.closed)],
    ['Real forecast window (no Sales)',n0(D.test.rows)]
   ].forEach(([k,v],i)=>{
     const r=el('div','kv'+(i===0?' tot':''));
     r.innerHTML=`<span class="k">${k}</span><span class="v2">${v}</span>`; $('#tlkv').appendChild(r);
   });
 })();
-$('#tlrule').innerHTML=`<b>Not yet selected.</b> ${D.cutoff} follows mechanically from the horizon length, but no cutoff has been agreed. `+
-  `Note also that the holdout spans <b>${n0(D.hold.stores)} stores</b> while the real forecast window covers <b>${n0(D.test.stores)}</b> &mdash; `+
-  `whether validation should be restricted to those ${n0(D.test.stores)} is an open question below.`;
+$('#tlrule').innerHTML=`<b>Approved and in use.</b> Every figure on this page is scored on this window. Note that the holdout spans `+
+  `<b>${n0(D.hold.stores)} stores</b> while the real forecast window covers <b>${n0(D.test.stores)}</b> &mdash; the `+
+  `${n0(D.hold.stores-D.test.stores)} out-of-scope stores are currently included, which remains an open question below.`;
 
 /* ---------- random split diagram ---------- */
 (function(){
@@ -342,7 +625,7 @@ $('#metriclead').innerHTML=`Judged against the spread the holdout actually conta
   t.appendChild(tb); $('#metrictbl').appendChild(t);
 })();
 $('#metricrule').innerHTML=`<b>MAE is primary because it is the one number that converts straight into money per store per day</b> &mdash; `+
-  `the unit a stock or staffing decision is actually made in. Every model reported at Stage 4 must show MAE on this split beside at least one `+
+  `the unit a stock or staffing decision is actually made in. Every model reported at Stage 5 must show MAE on this split beside at least one `+
   `naive baseline computed the same way.`;
 
 /* ---------- closed days ---------- */
@@ -356,12 +639,12 @@ $('#metricrule').innerHTML=`<b>MAE is primary because it is the one number that 
     r.innerHTML=`<span class="k">${k}</span><span class="v2">${v}</span>`; $('#closedkv').appendChild(r);
   });
 })();
-$('#closedrule').innerHTML=`<b>Proposed rule.</b> Where <span class="mono">Open = 0</span>, predict exactly 0 and leave the row out of the score. `+
+$('#closedrule').innerHTML=`<b>The rule in force.</b> Where <span class="mono">Open = 0</span>, predict exactly 0 and leave the row out of the score. `+
   `Closed days are published ahead, and <span class="mono">Open</span> is supplied for every row of the forecast window, so a closure is a known `+
   `fact rather than something to be predicted.`;
 $('#closednote').innerHTML=`Scoring closed rows instead would hand the model ${n0(D.hold.closed)} free exact answers in the holdout alone, `+
   `pulling MAE down by roughly ${Math.round(100*D.hold.closed/D.hold.rows)}% for no forecasting skill whatsoever. That is why this rule has to be `+
-  `settled before any two runs are compared. Separately, <b>${D.test_open_blank} rows in the real forecast window have a blank `+
+  `confirmed before any two runs are compared. Separately, <b>${D.test_open_blank} rows in the real forecast window have a blank `+
   `<span class="mono">Open</span></b> and still need a stated rule of their own.`;
 
 /* ---------- excluded ---------- */
@@ -384,15 +667,16 @@ $('#exclrule').innerHTML=`<b>Customers stays out.</b> It correlates strongly wit
   `engineered feature &mdash; state where its value comes from on a date inside the forecast window.`;
 
 /* ---------- open questions ---------- */
-[[`<b>Sign off the split cutoff.</b> ${D.cutoff} is proposed on the grounds that the holdout must match the ${D.horizon}-day horizon. It has not been chosen.`],
- [`<b>Holdout store scope.</b> The proposed window covers ${n0(D.hold.stores)} stores; the real forecast window covers ${n0(D.test.stores)}. Validating on stores that are out of forecast scope may not reflect the live task.`],
+[[`<b>Confirm the closed-day rule.</b> Every figure on this page excludes closed days from the score. It was proposed at Stage 3 and applied here, but never separately signed off &mdash; and it moves the headline by ${Math.round(100*(1-D.bl.closed_effect.mae_all/D.bl.closed_effect.mae_open))}%.`],
+ [`<b>Holdout store scope.</b> The approved window covers ${n0(D.hold.stores)} stores; the real forecast window covers ${n0(D.test.stores)}. The ${n0(D.hold.stores-D.test.stores)} out-of-scope stores are currently included in every baseline figure above.`],
  [`<b>Secondary metric.</b> MAE is primary. Whether RMSE is reported alongside it, and whether any per-store normalisation is used, is open.`],
  [`<b>The ${D.test_open_blank} blank <span class="mono">Open</span> values</b> in the forecast window need a stated rule &mdash; treat as open, carry the store&rsquo;s last known status, or infer from the weekday pattern.`],
  [`<b>Rolling-origin validation.</b> A single holdout gives one number. Whether to add walk-forward origins for a stability estimate is open.`],
 ].forEach(([t])=>{ const li=el('li'); li.innerHTML=t; $('#openq').appendChild(li); });
 
-$('#foot').innerHTML=`<b>Stage 3 is design only &mdash; no model has been fitted, no baseline computed, and no forecast produced.</b> `+
-  `The target, grain, primary metric and excluded columns are settled; the split cutoff and the closed-day rule are proposed and awaiting `+
-  `sign-off. Once those are agreed, the next step is a naive baseline &mdash; seasonal naive and per-store weekday median &mdash; scored on this `+
-  `split with MAE, which every later model must be compared against.`;
+$('#foot').innerHTML=`<b>Stage 4 complete &mdash; baselines only. No model has been fitted and no forecast produced for the live window.</b> `+
+  `Three naive rules were fitted on data ending ${D.fit.max} and scored on ${D.hold.min} to ${D.hold.max}. The benchmark is `+
+  `<b>${BEST.name}</b> at <b>MAE ${n0(BEST.mae)}</b>, or ${BEST.mae_pct.toFixed(1)}% of a typical trading day. `+
+  `A model is only worth deploying if it beats that number on this split, scored the same way &mdash; and the baseline code in `+
+  `<span class="mono">baselines.py</span> is reusable so the comparison stays like-for-like.`;
 </script>
