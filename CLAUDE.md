@@ -5,7 +5,8 @@ Guidance for Claude Code working in this repository.
 ## What this project is
 
 Store-level demand forecasting on the Rossmann retail dataset. The repository
-holds the raw data and the Stage 1 audit dashboard; no model or pipeline yet.
+holds the raw data, four dashboards covering audit through forecast review, and
+the scripts that rebuild them. See `outputs/README.md` for how to rerun.
 
 ```
 store.csv    1,115 rows    one row per store, static attributes
@@ -86,8 +87,9 @@ the operational decision the number supports.
 
 ## Confirmed facts
 
-Every fact below is visible in the Stage 1 audit dashboard, `01_data_audit.html`.
-Regenerate the dashboard and re-check this section if the data changes.
+Every fact below is visible in the Stage 1 audit dashboard,
+`outputs/01_data_audit.html`. Regenerate the dashboards and re-check this
+section if the data changes.
 
 **Files and roles**
 
