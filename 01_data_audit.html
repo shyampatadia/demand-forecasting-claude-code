@@ -1,0 +1,582 @@
+<title>Rossmann Data Audit</title>
+<style>
+  :root {
+    color-scheme: light;
+    --plane:#f9f9f7; --surface:#fcfcfb; --surface-2:#f4f3ef;
+    --ink:#0b0b0b; --ink-2:#52514e; --ink-muted:#898781;
+    --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
+    --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
+    --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b;
+    --good-ink:#006300; --crit-ink:#a52424; --warn-ink:#7a5300;
+    --sans:system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#232322;
+      --ink:#ffffff; --ink-2:#c3c2b7; --ink-muted:#898781;
+      --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+      --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+      --good-ink:#0ca30c; --crit-ink:#e66767; --warn-ink:#fab219;
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#232322;
+    --ink:#ffffff; --ink-2:#c3c2b7; --ink-muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+    --good-ink:#0ca30c; --crit-ink:#e66767; --warn-ink:#fab219;
+  }
+
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--plane); color:var(--ink);
+    font-family:var(--sans); font-size:14px; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:1560px; margin:0 auto; padding:28px 32px 56px; }
+
+  /* ---------- header ---------- */
+  .head { display:flex; justify-content:space-between; align-items:flex-end; gap:24px; flex-wrap:wrap; margin-bottom:22px; }
+  h1 { font-size:26px; font-weight:650; letter-spacing:-0.02em; margin:0 0 4px; }
+  .sub { color:var(--ink-2); font-size:13.5px; margin:0; }
+  .stage {
+    font-size:11px; font-weight:650; letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--s1); border:1px solid var(--s1); border-radius:3px; padding:5px 10px;
+    background:color-mix(in srgb, var(--s1) 8%, transparent); white-space:nowrap;
+  }
+  .srcline { font-family:var(--mono); font-size:11.5px; color:var(--ink-muted); margin-top:7px; }
+
+  /* ---------- verdict strip ---------- */
+  .verdicts { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:22px; }
+  .v {
+    display:flex; align-items:center; gap:7px; padding:7px 12px; border-radius:4px;
+    font-size:12.5px; font-weight:550; border:1px solid var(--border); background:var(--surface);
+  }
+  .dot { width:8px; height:8px; border-radius:50%; flex:none; }
+  .v.ok   .dot{background:var(--good);}  .v.ok   { color:var(--good-ink); }
+  .v.warn .dot{background:var(--warn);}  .v.warn { color:var(--warn-ink); }
+  .v.bad  .dot{background:var(--crit);}  .v.bad  { color:var(--crit-ink); }
+
+  /* ---------- cards ---------- */
+  .card {
+    background:var(--surface); border:1px solid var(--border); border-radius:6px;
+    padding:18px 20px; min-width:0;
+  }
+  .card > h2 {
+    font-size:12px; font-weight:650; letter-spacing:0.07em; text-transform:uppercase;
+    color:var(--ink-2); margin:0 0 14px; display:flex; align-items:center; gap:9px;
+  }
+  .chip {
+    font-size:10px; font-weight:650; letter-spacing:0.05em; padding:2px 7px; border-radius:3px;
+    text-transform:uppercase;
+  }
+  .chip.ok  { color:var(--good-ink); background:color-mix(in srgb,var(--good) 14%,transparent); }
+  .chip.warn{ color:var(--warn-ink); background:color-mix(in srgb,var(--warn) 20%,transparent); }
+  .chip.bad { color:var(--crit-ink); background:color-mix(in srgb,var(--crit) 14%,transparent); }
+  .note { font-size:12.5px; color:var(--ink-2); margin:12px 0 0; }
+  .note b { color:var(--ink); font-weight:600; }
+
+  /* ---------- summary tiles ---------- */
+  .tiles { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:14px; }
+  .tile { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:15px 17px; }
+  .tile .lab { font-size:11px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-muted); }
+  .tile .val { font-size:29px; font-weight:600; letter-spacing:-0.025em; margin:5px 0 2px; }
+  .tile .val span { font-size:15px; font-weight:500; color:var(--ink-2); letter-spacing:0; margin-left:6px; }
+  .tile .sub2 { font-size:12px; color:var(--ink-2); }
+
+  .duo { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+  .trio { display:grid; grid-template-columns:1.15fr 1fr 1fr; gap:14px; margin-bottom:14px; }
+  .full { margin-bottom:14px; }
+
+  /* ---------- tables ---------- */
+  table { border-collapse:collapse; width:100%; font-size:12.5px; }
+  th {
+    text-align:left; font-size:10.5px; font-weight:650; letter-spacing:0.06em; text-transform:uppercase;
+    color:var(--ink-muted); padding:0 10px 7px 0; border-bottom:1px solid var(--grid); white-space:nowrap;
+  }
+  td { padding:6px 10px 6px 0; border-bottom:1px solid var(--grid); vertical-align:middle; }
+  tr:last-child td { border-bottom:none; }
+  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; padding-right:18px; }
+  td.num:last-child, th.num:last-child { padding-right:0; }
+  .mono { font-family:var(--mono); font-size:11.5px; }
+  .yes { color:var(--good-ink); font-weight:650; }
+  .no  { color:var(--crit-ink); font-weight:650; }
+  .dash { color:var(--ink-muted); }
+  .scroll { overflow-x:auto; }
+
+  /* mini bar inside table cells */
+  .mb { height:6px; border-radius:3px; background:var(--s1); display:block; min-width:2px; }
+  .mb.crit { background:var(--crit); }
+  .mb.na   { background:var(--axis); }
+  .mbwrap { width:96px; }
+
+  /* ---------- charts ---------- */
+  svg { display:block; width:100%; height:auto; overflow:visible; }
+  .legend { display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--ink-2); margin-top:10px; }
+  .legend i { width:11px; height:11px; border-radius:2px; display:inline-block; margin-right:6px; vertical-align:-1px; }
+  .axtxt { font-size:10.5px; fill:var(--ink-muted); font-variant-numeric:tabular-nums; }
+  .gl { stroke:var(--grid); stroke-width:1; }
+  .base { stroke:var(--axis); stroke-width:1; }
+
+  /* ---------- leakage panel ---------- */
+  .leak {
+    border:1px solid var(--crit); border-radius:6px; background:var(--surface);
+    padding:18px 20px; margin-bottom:14px;
+  }
+  .leak > h2 { color:var(--crit-ink); }
+  .leakgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:4px; }
+  .lk { border:1px solid var(--border); border-radius:5px; padding:13px 15px; background:var(--surface-2); }
+  .lk .n { font-family:var(--mono); font-size:13px; font-weight:650; }
+  .lk .d { font-size:12px; color:var(--ink-2); margin-top:5px; }
+
+  /* ---------- part-to-whole bar ---------- */
+  .ptw { display:flex; gap:2px; height:30px; margin:6px 0 12px; }
+  .ptw > div { border-radius:2px; display:flex; align-items:center; justify-content:center;
+               font-size:11.5px; font-weight:600; color:#fff; overflow:hidden; white-space:nowrap; }
+
+  .kv { display:flex; justify-content:space-between; gap:14px; padding:6px 0; border-bottom:1px solid var(--grid); font-size:12.5px; }
+  .kv:last-child { border-bottom:none; }
+  .kv .k { color:var(--ink-2); }
+  .kv .v2 { font-variant-numeric:tabular-nums; font-weight:600; }
+
+  /* ---------- tooltip ---------- */
+  #tip {
+    position:fixed; pointer-events:none; opacity:0; transition:opacity .1s;
+    background:var(--surface); border:1px solid var(--border); border-radius:5px;
+    padding:8px 11px; font-size:12px; box-shadow:0 4px 14px rgba(0,0,0,.16); z-index:99;
+    font-variant-numeric:tabular-nums; max-width:230px;
+  }
+  #tip .t1 { font-weight:650; margin-bottom:3px; }
+  #tip .t2 { color:var(--ink-2); }
+
+  .foot { margin-top:26px; padding-top:16px; border-top:1px solid var(--grid); font-size:12.5px; color:var(--ink-2); }
+  .foot b { color:var(--ink); }
+
+  @media (max-width:1080px){
+    .tiles{grid-template-columns:repeat(2,1fr);} .duo,.trio{grid-template-columns:1fr;}
+    .leakgrid{grid-template-columns:1fr;}
+  }
+  @media (prefers-reduced-motion:reduce){ *{transition:none!important;} }
+</style>
+
+<div class="wrap">
+
+  <div class="head">
+    <div>
+      <h1>Rossmann Data Audit</h1>
+      <p class="sub">Structural inspection of the raw files before any modelling decision is made.</p>
+      <div class="srcline" id="srcline"></div>
+    </div>
+    <div class="stage">Stage 1 &middot; Audit only &middot; No forecast</div>
+  </div>
+
+  <div class="verdicts" id="verdicts"></div>
+
+  <div class="tiles" id="tiles"></div>
+
+  <!-- coverage timeline -->
+  <div class="card full">
+    <h2>Store coverage over time <span class="chip warn" id="covchip">Gap detected</span></h2>
+    <div id="covchart"></div>
+    <div class="legend">
+      <span><i style="background:var(--s1)"></i>Train history &mdash; stores reporting</span>
+      <span><i style="background:var(--s2)"></i>Test window &mdash; stores to forecast</span>
+    </div>
+    <p class="note" id="covnote"></p>
+  </div>
+
+  <div class="duo">
+    <!-- column comparison -->
+    <div class="card">
+      <h2>Train / test column comparison <span class="chip bad" id="colchip"></span></h2>
+      <div class="scroll"><table id="coltbl">
+        <thead><tr><th>Column</th><th>train.csv</th><th>test.csv</th><th>Available at forecast time?</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <p class="note">Columns present in <b>train only</b> cannot be used as predictors &mdash; they have no value on a future date. <span class="mono">Id</span> is a submission key, not a feature.</p>
+    </div>
+
+    <!-- grain -->
+    <div class="card">
+      <h2>Grain &amp; duplicate check <span class="chip ok">Clean</span></h2>
+      <div class="scroll"><table id="graintbl">
+        <thead><tr><th>File</th><th>Candidate key</th><th class="num">Rows</th><th class="num">Distinct keys</th><th class="num">Duplicates</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <p class="note" id="grainnote"></p>
+    </div>
+  </div>
+
+  <div class="duo">
+    <!-- missing values -->
+    <div class="card">
+      <h2>Missing values by column <span class="chip warn" id="misschip"></span></h2>
+      <div class="scroll"><table id="misstbl">
+        <thead><tr><th>File</th><th>Column</th><th class="num">Blank</th><th class="num">%</th><th></th><th>Reading</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+      <p class="note" id="missnote"></p>
+    </div>
+
+    <!-- open / closed / zero -->
+    <div class="card">
+      <h2>Open, closed &amp; zero-sales rows <span class="chip warn">Decision needed</span></h2>
+      <div class="ptw" id="ptw"></div>
+      <div id="ozkv"></div>
+      <p class="note" id="oznote"></p>
+    </div>
+  </div>
+
+  <div class="duo">
+    <!-- target -->
+    <div class="card">
+      <h2>Target identification <span class="chip warn">Unconfirmed</span></h2>
+      <div id="targetkv"></div>
+      <div style="margin-top:14px" id="histchart"></div>
+      <p class="note" id="targetnote"></p>
+    </div>
+
+    <!-- categorical coverage -->
+    <div class="card">
+      <h2>Category coverage: train vs test <span class="chip warn">Shift</span></h2>
+      <div id="catchart"></div>
+      <p class="note" id="catnote"></p>
+    </div>
+  </div>
+
+  <!-- leakage -->
+  <div class="leak">
+    <h2>Leakage watch <span class="chip bad">Blocking</span></h2>
+    <div class="leakgrid" id="leakgrid"></div>
+    <p class="note" id="leaknote"></p>
+  </div>
+
+  <div class="foot" id="foot"></div>
+</div>
+
+<div id="tip"><div class="t1"></div><div class="t2"></div></div>
+
+<script>
+const D = {"files":[{"name":"train.csv","rows":1017209,"cols":9,"bytes":38057952,"role":"history"},{"name":"test.csv","rows":41088,"cols":8,"bytes":1427425,"role":"forecast window"},{"name":"store.csv","rows":1115,"cols":10,"bytes":45010,"role":"store attributes"}],"colcompare":[{"col":"Store","train":true,"test":true},{"col":"DayOfWeek","train":true,"test":true},{"col":"Date","train":true,"test":true},{"col":"Sales","train":true,"test":false},{"col":"Customers","train":true,"test":false},{"col":"Open","train":true,"test":true},{"col":"Promo","train":true,"test":true},{"col":"StateHoliday","train":true,"test":true},{"col":"SchoolHoliday","train":true,"test":true},{"col":"Id","train":false,"test":true}],"storecols":["Store","StoreType","Assortment","CompetitionDistance","CompetitionOpenSinceMonth","CompetitionOpenSinceYear","Promo2","Promo2SinceWeek","Promo2SinceYear","PromoInterval"],"missing":[{"file":"train.csv","col":"Store","blank":0,"n":1017209},{"file":"train.csv","col":"DayOfWeek","blank":0,"n":1017209},{"file":"train.csv","col":"Date","blank":0,"n":1017209},{"file":"train.csv","col":"Sales","blank":0,"n":1017209},{"file":"train.csv","col":"Customers","blank":0,"n":1017209},{"file":"train.csv","col":"Open","blank":0,"n":1017209},{"file":"train.csv","col":"Promo","blank":0,"n":1017209},{"file":"train.csv","col":"StateHoliday","blank":0,"n":1017209},{"file":"train.csv","col":"SchoolHoliday","blank":0,"n":1017209},{"file":"test.csv","col":"Id","blank":0,"n":41088},{"file":"test.csv","col":"Store","blank":0,"n":41088},{"file":"test.csv","col":"DayOfWeek","blank":0,"n":41088},{"file":"test.csv","col":"Date","blank":0,"n":41088},{"file":"test.csv","col":"Open","blank":11,"n":41088},{"file":"test.csv","col":"Promo","blank":0,"n":41088},{"file":"test.csv","col":"StateHoliday","blank":0,"n":41088},{"file":"test.csv","col":"SchoolHoliday","blank":0,"n":41088},{"file":"store.csv","col":"Store","blank":0,"n":1115},{"file":"store.csv","col":"StoreType","blank":0,"n":1115},{"file":"store.csv","col":"Assortment","blank":0,"n":1115},{"file":"store.csv","col":"CompetitionDistance","blank":3,"n":1115},{"file":"store.csv","col":"CompetitionOpenSinceMonth","blank":354,"n":1115},{"file":"store.csv","col":"CompetitionOpenSinceYear","blank":354,"n":1115},{"file":"store.csv","col":"Promo2","blank":0,"n":1115},{"file":"store.csv","col":"Promo2SinceWeek","blank":544,"n":1115},{"file":"store.csv","col":"Promo2SinceYear","blank":544,"n":1115},{"file":"store.csv","col":"PromoInterval","blank":544,"n":1115}],"grain":{"train":{"keys":"Store + Date","dupe_keys":0,"unique":1017209,"rows":1017209},"test":{"keys":"Store + Date","dupe_keys":0,"unique":41088,"rows":41088},"test_id":{"keys":"Id","dupe_keys":0,"unique":41088,"rows":41088},"store":{"keys":"Store","dupe_keys":0,"unique":1115,"rows":1115}},"dates":{"train_min":"2013-01-01","train_max":"2015-07-31","train_days":942,"test_min":"2015-08-01","test_max":"2015-09-17","test_days":48,"gap_days":0},"stores":{"train":1115,"test":856,"both":856,"train_only":259,"test_only":0,"store_csv":1115},"panel":{"expected_days":942,"complete_stores":934,"short_stores":181,"counts":[[758,180],[941,1]]},"openzero":{"open":844392,"closed":172817,"zero_sales":172871,"open_zero":54,"closed_zero":172817,"closed_nonzero":0,"n":1017209},"sales":{"n":844338,"min":46.0,"p25":4859.0,"median":6369.0,"p75":8360.0,"p95":12668.0,"max":41551.0,"mean":6956.0},"sales_hist":{"bins":[26,710,3566,11016,24228,43779,65671,81130,88452,87738,79310,68955,59385,47891,38338,30456,24367,18897,14509,11165,8595,6743,5354,4318,3438,2786,2375,1912,1599,1405,1189,935,770,654,511,433,339,286,182,925],"max":25000},"leak":{"corr":0.8236,"cust_mean":762.8,"n":844338},"holiday":{"train":{"0":986159,"a":20260,"b":6690,"c":4100},"test":{"0":40908,"a":180}},"promo":{"train":{"1":388080,"0":629129},"test":{"1":16264,"0":24824}},"store_attrs":{"StoreType":{"c":148,"a":602,"d":348,"b":17},"Assortment":{"a":593,"c":513,"b":9},"promo2_zero":544,"promo2_zero_blank_interval":544},"cov":{"start":"2013-01-01","n":[1114,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,935,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115,1115]}};
+const fmt = n => n.toLocaleString('en-US');
+const pct = (a,b) => (100*a/b);
+const $ = s => document.querySelector(s);
+const el = (t,c,h) => { const e=document.createElement(t); if(c)e.className=c; if(h!==undefined)e.innerHTML=h; return e; };
+const SVGNS='http://www.w3.org/2000/svg';
+const svg = (t,a={}) => { const e=document.createElementNS(SVGNS,t); for(const k in a) e.setAttribute(k,a[k]); return e; };
+
+const tip=$('#tip');
+function showTip(e,t1,t2){
+  tip.querySelector('.t1').textContent=t1; tip.querySelector('.t2').innerHTML=t2;
+  tip.style.opacity=1;
+  const r=tip.getBoundingClientRect();
+  let x=e.clientX+14, y=e.clientY-10;
+  if(x+r.width>innerWidth-8) x=e.clientX-r.width-14;
+  if(y+r.height>innerHeight-8) y=innerHeight-r.height-8;
+  tip.style.left=x+'px'; tip.style.top=y+'px';
+}
+const hideTip=()=>tip.style.opacity=0;
+
+/* ---------- source line ---------- */
+const size = b => b >= 1048576 ? (b/1048576).toFixed(1)+' MB' : Math.round(b/1024)+' KB';
+$('#srcline').innerHTML = D.files
+  .map(f=>`<span style="white-space:nowrap">${f.name} &middot; ${fmt(f.rows)} rows &times; ${f.cols} cols &middot; ${size(f.bytes)}</span>`)
+  .join('<span style="color:var(--axis);padding:0 12px">|</span>');
+
+/* ---------- verdict strip ---------- */
+const verdicts=[
+  ['ok',  'Grain unique on Store + Date'],
+  ['ok',  'No duplicate rows in any file'],
+  ['ok',  'Forecast window is a complete rectangle'],
+  ['warn',`Panel gap: ${D.panel.short_stores} stores missing history`],
+  ['warn',`${D.missing.filter(m=>m.blank>0).length} columns contain blanks`],
+  ['bad', 'Customers is train-only — leakage risk'],
+  ['bad', 'Target, split & metric not yet confirmed'],
+];
+verdicts.forEach(([k,t])=>{
+  const v=el('div','v '+k); v.appendChild(el('span','dot')); v.appendChild(el('span',null,t));
+  $('#verdicts').appendChild(v);
+});
+
+/* ---------- summary tiles ---------- */
+const totalRows=D.files.reduce((s,f)=>s+f.rows,0);
+[['Files audited',D.files.length,'<span>csv</span>',`${fmt(totalRows)} rows in total`],
+ ['History rows',fmt(D.files[0].rows),'',`${D.dates.train_days} days &times; up to ${fmt(D.stores.train)} stores`],
+ ['Date coverage',D.dates.train_days+' <span>+ '+D.dates.test_days+'</span>','',
+   `${D.dates.train_min} &rarr; ${D.dates.test_max}`],
+ ['Stores to forecast',fmt(D.stores.test),`<span>of ${fmt(D.stores.train)}</span>`,
+   `${fmt(D.stores.train_only)} stores out of scope`]
+].forEach(([lab,val,suf,sub])=>{
+  const t=el('div','tile');
+  t.appendChild(el('div','lab',lab));
+  t.appendChild(el('div','val',val+(suf||'')));
+  t.appendChild(el('div','sub2',sub));
+  $('#tiles').appendChild(t);
+});
+
+/* ---------- coverage timeline ---------- */
+(function(){
+  const W=1480,H=210,ML=44,MR=14,MT=12,MB=26;
+  const nTr=D.cov.n.length, nTe=D.dates.test_days, N=nTr+nTe;
+  const series=D.cov.n.concat(Array(nTe).fill(D.stores.test));
+  const yMin=800, yMax=1150;
+  const x=i=>ML+(i/(N-1))*(W-ML-MR);
+  const y=v=>MT+(1-(v-yMin)/(yMax-yMin))*(H-MT-MB);
+  const s=svg('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Stores reporting per day across the training history and the forecast window'});
+
+  for(let v=800;v<=1100;v+=100){
+    s.appendChild(svg('line',{x1:ML,x2:W-MR,y1:y(v),y2:y(v),class:'gl'}));
+    const tx=svg('text',{x:ML-8,y:y(v)+3.5,class:'axtxt','text-anchor':'end'}); tx.textContent=fmt(v); s.appendChild(tx);
+  }
+  const d0=new Date(D.cov.start+'T00:00:00Z');
+  const dateAt=i=>{const d=new Date(d0); d.setUTCDate(d.getUTCDate()+i); return d;};
+  for(let i=0;i<N;i++){
+    const d=dateAt(i);
+    if(d.getUTCDate()===1 && d.getUTCMonth()%6===0){
+      s.appendChild(svg('line',{x1:x(i),x2:x(i),y1:MT,y2:H-MB,class:'gl'}));
+      const tx=svg('text',{x:x(i),y:H-MB+15,class:'axtxt','text-anchor':'middle'});
+      tx.textContent=d.toLocaleDateString('en-US',{month:'short',year:'2-digit',timeZone:'UTC'});
+      s.appendChild(tx);
+    }
+  }
+  const line=(from,to,color)=>{
+    let p='';
+    for(let i=from;i<=to;i++) p+=(i===from?'M':'L')+x(i).toFixed(1)+' '+y(series[i]).toFixed(1);
+    s.appendChild(svg('path',{d:p,fill:'none',stroke:color,'stroke-width':2,'stroke-linejoin':'round'}));
+    let a=`M${x(from).toFixed(1)} ${H-MB}`;
+    for(let i=from;i<=to;i++) a+='L'+x(i).toFixed(1)+' '+y(series[i]).toFixed(1);
+    a+=`L${x(to).toFixed(1)} ${H-MB}Z`;
+    s.appendChild(svg('path',{d:a,fill:color,opacity:.12}));
+  };
+  line(0,nTr-1,'var(--s1)');
+  line(nTr,N-1,'var(--s2)');
+
+  s.appendChild(svg('line',{x1:x(nTr-1),x2:x(nTr-1),y1:MT,y2:H-MB,stroke:'var(--axis)','stroke-width':1.5,'stroke-dasharray':'0'}));
+  const sp=svg('text',{x:x(nTr-1)-7,y:MT+11,class:'axtxt','text-anchor':'end','font-weight':'650'});
+  sp.textContent='train ends '+D.dates.train_max; s.appendChild(sp);
+  s.appendChild(svg('line',{x1:ML,x2:W-MR,y1:H-MB,y2:H-MB,class:'base'}));
+
+  const cross=svg('line',{x1:0,x2:0,y1:MT,y2:H-MB,stroke:'var(--ink-muted)','stroke-width':1,opacity:0});
+  const mk=svg('circle',{r:4,fill:'var(--s1)',stroke:'var(--surface)','stroke-width':2,opacity:0});
+  s.appendChild(cross); s.appendChild(mk);
+  const hit=svg('rect',{x:ML,y:MT,width:W-ML-MR,height:H-MT-MB,fill:'transparent'});
+  hit.addEventListener('mousemove',ev=>{
+    const r=s.getBoundingClientRect(), px=(ev.clientX-r.left)/r.width*W;
+    let i=Math.round((px-ML)/(W-ML-MR)*(N-1)); i=Math.max(0,Math.min(N-1,i));
+    const inTrain=i<nTr, d=dateAt(i);
+    cross.setAttribute('x1',x(i)); cross.setAttribute('x2',x(i)); cross.setAttribute('opacity',.5);
+    mk.setAttribute('cx',x(i)); mk.setAttribute('cy',y(series[i]));
+    mk.setAttribute('fill',inTrain?'var(--s1)':'var(--s2)'); mk.setAttribute('opacity',1);
+    showTip(ev,d.toISOString().slice(0,10),
+      `${fmt(series[i])} stores &middot; ${inTrain?'train history':'test window'}`);
+  });
+  hit.addEventListener('mouseleave',()=>{cross.setAttribute('opacity',0);mk.setAttribute('opacity',0);hideTip();});
+  s.appendChild(hit);
+  $('#covchart').appendChild(s);
+  const yax=svg('text',{}); // noop
+})();
+
+$('#covnote').innerHTML =
+ `<b>${D.panel.short_stores} stores</b> are missing a contiguous block of history &mdash; ${D.panel.counts[0][1]} of them lack exactly `+
+ `<b>184 days</b> (2014-07-01 to 2014-12-31), one lacks a single day. These are <b>absent rows, not zero-sales rows</b>: `+
+ `any reshape to a dense store &times; date matrix must handle the hole deliberately. Axis starts at 800 to keep the dip legible.`;
+
+/* ---------- column comparison ---------- */
+(function(){
+  const tb=$('#coltbl tbody');
+  const why={Id:['key','Submission key in test only &mdash; not a feature'],
+             Sales:['no','TARGET &mdash; train only'],
+             Customers:['no','Train only &mdash; unknowable in advance'],
+             Store:['yes','Static identifier'],DayOfWeek:['yes','Derivable from the calendar'],
+             Date:['yes','Known'],Open:['yes','Published trading calendar'],
+             Promo:['yes','Planned in advance'],StateHoliday:['yes','Published calendar'],
+             SchoolHoliday:['yes','Published calendar']};
+  let blocked=0;
+  D.colcompare.forEach(c=>{
+    const w=why[c.col]||['yes',''];
+    if(w[0]==='no') blocked++;
+    const tr=el('tr');
+    tr.innerHTML=`<td class="mono">${c.col}</td>`+
+      `<td>${c.train?'<span class="yes">&#10003;</span>':'<span class="dash">&mdash;</span>'}</td>`+
+      `<td>${c.test?'<span class="yes">&#10003;</span>':'<span class="dash">&mdash;</span>'}</td>`+
+      `<td>${w[0]==='no'?'<span class="no">NO &mdash; '+w[1]+'</span>':
+             w[0]==='key'?'<span class="dash">'+w[1]+'</span>':
+             '<span class="yes">Yes</span> <span class="dash">&mdash; '+w[1]+'</span>'}</td>`;
+    tb.appendChild(tr);
+  });
+  $('#colchip').textContent=blocked+' train-only';
+})();
+
+/* ---------- grain ---------- */
+(function(){
+  const tb=$('#graintbl tbody');
+  [['train.csv',D.grain.train],['test.csv',D.grain.test],['test.csv',D.grain.test_id],['store.csv',D.grain.store]]
+  .forEach(([f,g])=>{
+    const tr=el('tr');
+    tr.innerHTML=`<td class="mono">${f}</td><td class="mono">${g.keys}</td>`+
+      `<td class="num">${fmt(g.rows)}</td><td class="num">${fmt(g.unique)}</td>`+
+      `<td class="num">${g.dupe_keys===0?'<span class="yes">0</span>':'<span class="no">'+fmt(g.dupe_keys)+'</span>'}</td>`;
+    tb.appendChild(tr);
+  });
+})();
+$('#grainnote').innerHTML=`Grain is confirmed as <b>one row per store per calendar day</b> in both files. `+
+  `Test is a complete rectangle: ${fmt(D.stores.test)} stores &times; ${D.dates.test_days} days = <b>${fmt(D.grain.test.rows)}</b> rows, no gaps. `+
+  `Horizon is <b>${D.dates.test_days} days</b> and begins the day after training data ends (gap: ${D.dates.gap_days} days).`;
+
+/* ---------- missing values ---------- */
+(function(){
+  const tb=$('#misstbl tbody');
+  const rows=D.missing.filter(m=>m.blank>0);
+  const reading={
+    'Open':'Trading status unknown &mdash; needs an explicit decision',
+    'CompetitionDistance':'Genuinely missing',
+    'CompetitionOpenSinceMonth':'Competitor open date unknown',
+    'CompetitionOpenSinceYear':'Competitor open date unknown',
+    'Promo2SinceWeek':'Not applicable &mdash; store has no Promo2',
+    'Promo2SinceYear':'Not applicable &mdash; store has no Promo2',
+    'PromoInterval':'Not applicable &mdash; store has no Promo2'
+  };
+  const na=c=>c.startsWith('Promo2')||c==='PromoInterval';
+  rows.sort((a,b)=>b.blank/b.n-a.blank/a.n);
+  rows.forEach(m=>{
+    const p=pct(m.blank,m.n), isNa=na(m.col);
+    const tr=el('tr');
+    tr.innerHTML=`<td class="mono">${m.file.replace('.csv','')}</td><td class="mono">${m.col}</td>`+
+      `<td class="num">${fmt(m.blank)}</td><td class="num">${p<0.1?p.toFixed(2):p.toFixed(1)}%</td>`+
+      `<td><span class="mbwrap" style="display:block"><span class="mb ${isNa?'na':(m.col==='Open'?'crit':'')}" style="width:${Math.max(2,p)}%"></span></span></td>`+
+      `<td style="color:var(--ink-2)">${reading[m.col]||''}</td>`;
+    tb.appendChild(tr);
+  });
+  $('#misschip').textContent=rows.length+' of '+D.missing.length+' columns';
+})();
+$('#missnote').innerHTML=`The ${fmt(D.store_attrs.promo2_zero)} blanks in the three Promo2 columns match the `+
+  `${fmt(D.store_attrs.promo2_zero)} stores with <span class="mono">Promo2 = 0</span> <b>exactly</b> &mdash; they mean `+
+  `&ldquo;not applicable&rdquo;, not &ldquo;missing&rdquo;. Imputing them would invent promotions. `+
+  `<b>test.Open has 11 blanks</b> inside the forecast window and needs a stated rule, not a silent fillna.`;
+
+/* ---------- open / closed ---------- */
+(function(){
+  const o=D.openzero, n=o.n;
+  const bar=$('#ptw');
+  [['Open '+ (100*o.open/n).toFixed(1)+'%','var(--s1)',o.open],
+   ['Closed '+(100*o.closed/n).toFixed(1)+'%','var(--ink-muted)',o.closed]]
+  .forEach(([lab,c,v])=>{
+    const d=el('div',null,lab); d.style.background=c; d.style.flex=v;
+    d.addEventListener('mousemove',e=>showTip(e,lab.split(' ')[0]+' rows',fmt(v)+' of '+fmt(n)));
+    d.addEventListener('mouseleave',hideTip);
+    bar.appendChild(d);
+  });
+  const kv=$('#ozkv');
+  [['Rows with Sales = 0',o.zero_sales],
+   ['&nbsp;&nbsp;&mdash; closed (expected)',o.closed_zero],
+   ['&nbsp;&nbsp;&mdash; open but zero sales',o.open_zero],
+   ['Closed with non-zero sales',o.closed_nonzero]
+  ].forEach(([k,v])=>{
+    const r=el('div','kv');
+    r.innerHTML=`<span class="k">${k}</span><span class="v2">${fmt(v)}</span>`;
+    kv.appendChild(r);
+  });
+})();
+$('#oznote').innerHTML=`Closed days and zero-sales days coincide almost perfectly &mdash; only `+
+  `<b>${D.openzero.open_zero} rows</b> are open with zero takings. Whether closed days are excluded from fitting and `+
+  `scored as zero, or modelled directly, <b>changes every error metric</b>. Settle it before comparing any two runs.`;
+
+/* ---------- target + histogram ---------- */
+(function(){
+  const kv=$('#targetkv'), s=D.sales;
+  [['Candidate target','Sales'],['Units','currency per store per day'],
+   ['Rows scored (open, non-zero)',fmt(s.n)],['Median',fmt(s.median)],
+   ['Mean',fmt(s.mean)],['95th percentile',fmt(s.p95)],['Range',fmt(s.min)+' &ndash; '+fmt(s.max)]
+  ].forEach(([k,v])=>{
+    const r=el('div','kv'); r.innerHTML=`<span class="k">${k}</span><span class="v2">${v}</span>`; kv.appendChild(r);
+  });
+
+  const W=560,H=120,ML=8,MR=8,MT=8,MB=20;
+  const b=D.sales_hist.bins, mx=Math.max(...b), bw=(W-ML-MR)/b.length;
+  const sv=svg('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Distribution of daily sales on open, non-zero days'});
+  b.forEach((v,i)=>{
+    const h=(v/mx)*(H-MT-MB);
+    const r=svg('rect',{x:ML+i*bw+1,y:H-MB-h,width:Math.max(1,bw-2),height:h,fill:'var(--s1)',rx:2});
+    const lo=Math.round(i*D.sales_hist.max/b.length), hi=Math.round((i+1)*D.sales_hist.max/b.length);
+    r.addEventListener('mousemove',e=>showTip(e,fmt(lo)+'–'+fmt(hi),fmt(v)+' store-days'));
+    r.addEventListener('mouseleave',hideTip);
+    sv.appendChild(r);
+  });
+  sv.appendChild(svg('line',{x1:ML,x2:W-MR,y1:H-MB,y2:H-MB,class:'base'}));
+  [[0,'0'],[0.4,'10k'],[0.8,'20k'],[1,'25k+']].forEach(([f,lab])=>{
+    const t=svg('text',{x:ML+f*(W-ML-MR),y:H-MB+14,class:'axtxt','text-anchor':f===0?'start':f===1?'end':'middle'});
+    t.textContent=lab; sv.appendChild(t);
+  });
+  $('#histchart').appendChild(sv);
+})();
+$('#targetnote').innerHTML=`<b>Sales</b> is inferred as the target because test.csv omits it &mdash; this was not stated by the user `+
+  `and needs confirming, along with the evaluation metric and the validation cutoff, before any model runs.`;
+
+/* ---------- category coverage ---------- */
+(function(){
+  const cats=['0','a','b','c'], names={'0':'None','a':'Public','b':'Easter','c':'Christmas'};
+  const W=560,H=150,ML=52,MR=10,MT=8,MB=34;
+  const trN=D.files[0].rows, teN=D.files[1].rows;
+  const vals=cats.map(c=>[pct(D.holiday.train[c]||0,trN), pct(D.holiday.test[c]||0,teN)]);
+  const mx=Math.max(...vals.flat().slice(2))*1.15 || 1;
+  const sv=svg('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'StateHoliday category share in train versus test'});
+  const bandW=(W-ML-MR)/(cats.length-1);
+  [0,mx/2,mx].forEach(v=>{
+    const y=H-MB-(v/mx)*(H-MT-MB);
+    sv.appendChild(svg('line',{x1:ML,x2:W-MR,y1:y,y2:y,class:'gl'}));
+    const t=svg('text',{x:ML-7,y:y+3.5,class:'axtxt','text-anchor':'end'}); t.textContent=v.toFixed(1)+'%'; sv.appendChild(t);
+  });
+  cats.slice(1).forEach((c,i)=>{
+    const x0=ML+i*bandW+bandW*0.18, bw=bandW*0.28;
+    [[vals[i+1][0],'var(--s1)',0],[vals[i+1][1],'var(--s2)',1]].forEach(([v,col,k])=>{
+      const h=Math.max(0,(v/mx)*(H-MT-MB));
+      const r=svg('rect',{x:x0+k*(bw+4),y:H-MB-h,width:bw,height:h,fill:col,rx:2});
+      r.addEventListener('mousemove',e=>showTip(e,'StateHoliday = '+c+' ('+names[c]+')',
+        (k?'test':'train')+': '+v.toFixed(2)+'% of rows'));
+      r.addEventListener('mouseleave',hideTip);
+      sv.appendChild(r);
+      if(v===0){
+        const t=svg('text',{x:x0+k*(bw+4)+bw/2,y:H-MB-6,class:'axtxt','text-anchor':'middle','font-weight':'650'});
+        t.textContent='0'; t.setAttribute('fill','var(--crit)'); sv.appendChild(t);
+      }
+    });
+    const t=svg('text',{x:x0+bw+2,y:H-MB+15,class:'axtxt','text-anchor':'middle'});
+    t.textContent=c+' · '+names[c]; sv.appendChild(t);
+  });
+  sv.appendChild(svg('line',{x1:ML,x2:W-MR,y1:H-MB,y2:H-MB,class:'base'}));
+  const lg=svg('text',{x:ML,y:H-4,class:'axtxt'}); lg.textContent='StateHoliday category (excluding “none”)'; sv.appendChild(lg);
+  $('#catchart').appendChild(sv);
+  const l=el('div','legend');
+  l.innerHTML='<span><i style="background:var(--s1)"></i>train.csv</span><span><i style="background:var(--s2)"></i>test.csv</span>';
+  $('#catchart').appendChild(l);
+})();
+$('#catnote').innerHTML=`<span class="mono">StateHoliday</span> takes <b>0 / a / b / c</b> in train but only <b>0 / a</b> in test &mdash; `+
+  `Easter and Christmas never occur in the forecast window. Any encoder fitted on train must not error or drift on unseen-in-test levels. `+
+  `Promo is present in both (${pct(D.promo.train['1'],D.files[0].rows).toFixed(0)}% of train rows, ${pct(D.promo.test['1'],D.files[1].rows).toFixed(0)}% of test).`;
+
+/* ---------- leakage ---------- */
+(function(){
+  const g=$('#leakgrid');
+  [['Customers','In train, absent from test',
+    `Correlation with Sales: <b>${D.leak.corr.toFixed(3)}</b> on ${fmt(D.leak.n)} open days. Mean ${fmt(Math.round(D.leak.cust_mean))} customers/day. Strong, useless, and unknowable on a future date.`],
+   ['Sales','The target itself',
+    'Any lag, rolling mean, or per-store aggregate must be computed strictly behind the split cutoff. A rolling window that peeks past it is the same error wearing a different hat.'],
+   ['Engineered features','Test before adding',
+    'For every new feature, state where its value comes from on a date inside the forecast window. If the answer needs data from that window, it leaks.']
+  ].forEach(([n,d,x])=>{
+    const c=el('div','lk');
+    c.innerHTML=`<div class="n">${n}</div><div class="d" style="font-weight:600;color:var(--crit-ink)">${d}</div><div class="d">${x}</div>`;
+    g.appendChild(c);
+  });
+})();
+$('#leaknote').innerHTML=`<b>Customers</b> is the trap in this dataset: it correlates strongly with the target, it sits right next to it in `+
+  `train.csv, and it does not exist in test.csv. A model that uses it will score well in validation and cannot be run in production.`;
+
+$('#foot').innerHTML=`<b>Stage 1 complete &mdash; no forecast has been produced.</b> Three things must be agreed in writing before any model runs: `+
+  `the <b>target</b> and its units, the <b>grain</b> of a prediction, and the exact <b>split cutoff</b>. `+
+  `A like-for-like validation window would be the last ${D.dates.test_days} days of train (2015-06-14 &rarr; ${D.dates.train_max}), matching the horizon length. `+
+  `Splits must be chronological &mdash; never random.`;
+</script>
