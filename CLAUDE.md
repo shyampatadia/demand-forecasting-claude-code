@@ -5,7 +5,7 @@ Guidance for Claude Code working in this repository.
 ## What this project is
 
 Store-level demand forecasting on the Rossmann retail dataset. The repository
-currently holds raw data only — no code, notebooks, or pipeline yet.
+holds the raw data and the Stage 1 audit dashboard; no model or pipeline yet.
 
 ```
 store.csv    1,115 rows    one row per store, static attributes
@@ -86,25 +86,81 @@ the operational decision the number supports.
 
 ## Confirmed facts
 
-Profiled directly from the files on 2026-08-14. Re-verify if the data changes.
+Every fact below is visible in the Stage 1 audit dashboard, `01_data_audit.html`.
+Regenerate the dashboard and re-check this section if the data changes.
 
-**Grain and coverage**
+**Files and roles**
 
-- `train.csv` — one row per store per calendar day, 2013-01-01 to 2015-07-31
-  (942 days), 1,115 stores.
-- `test.csv` — same grain, 2015-08-01 to 2015-09-17 (48 days), **856 stores**.
-  A complete rectangle: 856 x 48 = 41,088 rows, no gaps.
-- The forecast horizon is therefore 48 days ahead, and it begins the day after
-  training data ends. There is no gap between the two windows.
-- All 856 test stores appear in train. 259 train stores are absent from test
-  and are out of forecast scope.
+| file | role | rows | columns |
+|---|---|---|---|
+| `train.csv` | history — the only file carrying `Sales` | 1,017,209 | 9 |
+| `test.csv` | forecast window — no `Sales` | 41,088 | 8 |
+| `store.csv` | static store attributes, one row per store | 1,115 | 10 |
+
+**Grain**
+
+- Grain is **one row per store per calendar day** in both `train.csv` and
+  `test.csv`. `Store + Date` is unique in both — 1,017,209 distinct keys in
+  train, 41,088 in test — with **zero duplicates** in either file.
+- `store.csv` is unique on `Store` (1,115 rows, 1,115 keys). `test.Id` is
+  unique (41,088).
+
+**Dates and coverage**
+
+- `train.csv` — 2013-01-01 to 2015-07-31, 942 days, up to 1,115 stores.
+- `test.csv` — 2015-08-01 to 2015-09-17, 48 days, **856 stores**. A complete
+  rectangle: 856 x 48 = 41,088 rows, no gaps.
+- The forecast horizon is therefore 48 days, beginning the day after training
+  data ends. There is no gap between the two windows.
+- 856 of the 1,115 train stores are in forecast scope; the other 259 are out
+  of scope.
 
 **The panel is not complete**
 
-- 180 stores are missing a contiguous 184-day block, 2014-07-01 to 2014-12-31
-  (758 rows instead of 942). One further store is missing a single day.
+- 181 stores are missing history. 180 of them lack exactly a contiguous
+  **184-day block**, 2014-07-01 to 2014-12-31; one lacks a single day.
 - These are absent rows, not zero-sales rows. Any code that reshapes to a dense
   store x date matrix must handle the gap deliberately.
+
+**Target**
+
+- The target is **`Sales`** — daily revenue per store, one value per store per
+  calendar day.
+- 844,338 rows are open with non-zero Sales: median 6,369, mean 6,956,
+  95th percentile 12,668, range 46 to 41,551.
+
+**`Customers` is train-only and not safe for future forecasting**
+
+- Present in `train.csv`, **absent from `test.csv`**.
+- Correlates **0.824** with Sales across 844,338 trading days; mean 763
+  customers per day.
+- Classified **descriptive only**: it is a same-day measurement, not a
+  published plan, so it has no value on a future date. Using it would require
+  forecasting footfall first. See rule 5.
+
+**Open, closed and zero-sales rows**
+
+- 83.0% of train rows are Open, 17.0% closed.
+- 172,871 rows have Sales == 0; 172,817 of those are closed. Only **54 rows**
+  are open with zero sales, and **0 rows** are closed with non-zero sales.
+
+**Missing values**
+
+- 7 of 27 columns contain blanks; six of the seven are in `store.csv`.
+- `store.csv` — `Promo2SinceWeek`, `Promo2SinceYear`, `PromoInterval`: 544 each
+  (48.8%). These match the 544 stores with `Promo2 == 0` **exactly**, so they
+  mean "not applicable", not "missing". Imputing them would invent promotions.
+- `store.csv` — `CompetitionOpenSinceMonth` and `CompetitionOpenSinceYear`: 354
+  each (31.7%). `CompetitionDistance`: 3 (0.3%), genuinely missing.
+- `store.csv` — `Store`, `StoreType`, `Assortment`, `Promo2` have no blanks.
+- `test.csv` — `Open`: 11 blanks (0.03%) inside the forecast window. Needs a
+  stated rule, not a silent fillna.
+
+**Category coverage**
+
+- `StateHoliday` takes values 0/a/b/c in train but only 0/a in test — Easter
+  and Christmas never occur in the forecast window.
+- `Promo` is present in both: 38% of train rows, 40% of test rows.
 
 **Columns**
 
@@ -112,26 +168,20 @@ Profiled directly from the files on 2026-08-14. Re-verify if the data changes.
   StateHoliday, SchoolHoliday.
 - `test.csv`: Id, Store, DayOfWeek, Date, Open, Promo, StateHoliday,
   SchoolHoliday. Note `Id` (submission key) and the absence of Sales/Customers.
+- `store.csv`: Store, StoreType, Assortment, CompetitionDistance,
+  CompetitionOpenSinceMonth, CompetitionOpenSinceYear, Promo2,
+  Promo2SinceWeek, Promo2SinceYear, PromoInterval.
 - **Train-only columns: `Sales` (the target) and `Customers`.** See rule 5.
 
-**Data quality**
+**Stage 1 output**
 
-- `test.Open` has 11 blank values. Needs an explicit decision, not a silent fillna.
-- `StateHoliday` takes values 0/a/b/c in train but only 0/a in test — categories
-  b and c never occur in the forecast window.
-- 172,871 train rows (17.0%) have Sales == 0; 172,817 rows have Open == 0. The
-  two nearly coincide: only 54 rows are open with zero sales.
-- `store.csv` blanks: CompetitionDistance 3; CompetitionOpenSinceMonth/Year 354
-  each; Promo2SinceWeek/Year and PromoInterval 544 each. The 544 correspond
-  exactly to the 544 stores with Promo2 == 0, so those blanks mean
-  "not applicable", not "missing".
+- `01_data_audit.html` — the data audit dashboard, at the repository root.
+  Regenerate it whenever the underlying files change.
 
 ## Assumptions
 
 Unconfirmed. Each needs a user decision before it hardens into code.
 
-- **Target is `Sales`** (daily revenue per store), not `Customers` — inferred
-  from test.csv omitting Sales, not stated by the user.
 - **Closed days.** Whether rows with Open == 0 are excluded from fitting and
   scored as zero, or modelled directly, is undecided. This materially changes
   every error metric, so settle it before comparing runs.
