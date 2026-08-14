@@ -1,0 +1,545 @@
+<title>Rossmann Demand Patterns</title>
+<style>
+  :root {
+    color-scheme: light;
+    --plane:#f9f9f7; --surface:#fcfcfb; --surface-2:#f4f3ef;
+    --ink:#0b0b0b; --ink-2:#52514e; --ink-muted:#898781;
+    --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
+    --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a;
+    --good:#0ca30c; --warn:#fab219; --crit:#d03b3b;
+    --good-ink:#006300; --crit-ink:#a52424; --warn-ink:#7a5300;
+    --faint:#b9c8dc;
+    --sans:system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      color-scheme: dark;
+      --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#232322;
+      --ink:#ffffff; --ink-2:#c3c2b7; --ink-muted:#898781;
+      --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+      --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+      --good-ink:#0ca30c; --crit-ink:#e66767; --warn-ink:#fab219;
+      --faint:#3d4b5c;
+    }
+  }
+  :root[data-theme="dark"]{
+    color-scheme: dark;
+    --plane:#0d0d0d; --surface:#1a1a19; --surface-2:#232322;
+    --ink:#ffffff; --ink-2:#c3c2b7; --ink-muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70;
+    --good-ink:#0ca30c; --crit-ink:#e66767; --warn-ink:#fab219;
+    --faint:#3d4b5c;
+  }
+
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--plane); color:var(--ink);
+         font-family:var(--sans); font-size:14px; line-height:1.5; -webkit-font-smoothing:antialiased; }
+  .wrap { max-width:1560px; margin:0 auto; padding:28px 32px 56px; }
+
+  .head { display:flex; justify-content:space-between; align-items:flex-end; gap:24px; flex-wrap:wrap; margin-bottom:20px; }
+  h1 { font-size:26px; font-weight:650; letter-spacing:-0.02em; margin:0 0 4px; }
+  .sub { color:var(--ink-2); font-size:13.5px; margin:0; max-width:76ch; }
+  .stage { font-size:11px; font-weight:650; letter-spacing:0.08em; text-transform:uppercase;
+    color:var(--s3); border:1px solid var(--s3); border-radius:3px; padding:5px 10px;
+    background:color-mix(in srgb, var(--s3) 8%, transparent); white-space:nowrap; }
+  .unitnote { font-size:11.5px; color:var(--ink-muted); margin-top:7px; }
+
+  /* KPI strip */
+  .kpis { display:grid; grid-template-columns:repeat(5,1fr); gap:14px; margin-bottom:16px; }
+  .kpi { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:15px 17px; }
+  .kpi .lab { font-size:11px; font-weight:600; letter-spacing:0.06em; text-transform:uppercase; color:var(--ink-muted); }
+  .kpi .val { font-size:30px; font-weight:600; letter-spacing:-0.025em; margin:5px 0 2px; }
+  .kpi .val em { font-style:normal; font-size:16px; font-weight:500; color:var(--ink-2); margin-left:3px; }
+  .kpi .sub2 { font-size:12px; color:var(--ink-2); }
+
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:18px 20px; min-width:0; }
+  .card > h2 { font-size:12px; font-weight:650; letter-spacing:0.07em; text-transform:uppercase;
+               color:var(--ink-2); margin:0 0 4px; display:flex; align-items:center; gap:9px; }
+  .card > .lead { font-size:12.5px; color:var(--ink-muted); margin:0 0 14px; }
+  .duo { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px; }
+  .trio { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-bottom:14px; }
+  .full { margin-bottom:14px; }
+
+  .take { border-left:2px solid var(--s1); padding-left:11px; margin-top:14px;
+          font-size:12.5px; color:var(--ink); line-height:1.5; }
+  .take b { font-weight:650; }
+  .take.alt { border-left-color:var(--s2); }
+  .take.pos { border-left-color:var(--good); }
+
+  svg { display:block; width:100%; height:auto; overflow:visible; }
+  .axtxt { font-size:10.5px; fill:var(--ink-muted); font-variant-numeric:tabular-nums; }
+  .axtxt.b { font-weight:650; fill:var(--ink-2); }
+  .gl { stroke:var(--grid); stroke-width:1; }
+  .base { stroke:var(--axis); stroke-width:1; }
+  .legend { display:flex; gap:16px; flex-wrap:wrap; font-size:12px; color:var(--ink-2); margin-top:9px; }
+  .legend i { width:11px; height:11px; border-radius:2px; display:inline-block; margin-right:6px; vertical-align:-1px; }
+
+  /* horizontal bar rows */
+  .hb { display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:center; padding:5px 0; }
+  .hb .lbl { font-size:12px; white-space:nowrap; }
+  .hb .lbl small { color:var(--ink-muted); font-size:11px; margin-left:5px; }
+  .hb .track { background:var(--surface-2); border-radius:3px; height:16px; overflow:hidden; }
+  .hb .fill { height:100%; border-radius:3px; background:var(--s1); }
+  .hb .num { font-size:12px; font-variant-numeric:tabular-nums; font-weight:600; min-width:58px; text-align:right; }
+  .hb.mono .lbl { font-family:var(--mono); font-size:11.5px; }
+
+  /* part-to-whole */
+  .ptw { display:flex; gap:2px; height:32px; margin:4px 0 10px; }
+  .ptw > div { border-radius:2px; display:flex; align-items:center; justify-content:center;
+               font-size:11.5px; font-weight:600; color:#fff; overflow:hidden; white-space:nowrap; }
+  .kv { display:flex; justify-content:space-between; gap:14px; padding:6px 0; border-bottom:1px solid var(--grid); font-size:12.5px; }
+  .kv:last-child { border-bottom:none; }
+  .kv .k { color:var(--ink-2); }
+  .kv .v2 { font-variant-numeric:tabular-nums; font-weight:600; }
+
+  /* compare pair (promo / school) */
+  .cmp { display:flex; align-items:flex-end; gap:16px; margin:8px 0 4px; }
+  .cmp .col { flex:1; text-align:center; }
+  .cmp .bar { border-radius:4px 4px 0 0; margin:0 auto; width:100%; max-width:110px; }
+  .cmp .cv { font-size:19px; font-weight:650; letter-spacing:-0.02em; margin-top:8px; font-variant-numeric:tabular-nums; }
+  .cmp .cl { font-size:11.5px; color:var(--ink-2); }
+  .cmp .cn { font-size:10.5px; color:var(--ink-muted); }
+  .upl { display:inline-flex; align-items:baseline; gap:6px; padding:5px 11px; border-radius:4px;
+         background:color-mix(in srgb, var(--good) 12%, transparent); color:var(--good-ink);
+         font-size:13px; font-weight:650; margin-top:6px; }
+  .upl small { font-weight:500; font-size:11.5px; }
+
+  table { border-collapse:collapse; width:100%; font-size:12.5px; }
+  th { text-align:left; font-size:10.5px; font-weight:650; letter-spacing:0.06em; text-transform:uppercase;
+       color:var(--ink-muted); padding:0 12px 7px 0; border-bottom:1px solid var(--grid); white-space:nowrap; }
+  td { padding:6px 12px 6px 0; border-bottom:1px solid var(--grid); }
+  tr:last-child td { border-bottom:none; }
+  td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; padding-right:14px; }
+  td.num:last-child, th.num:last-child { padding-right:0; }
+  .mono { font-family:var(--mono); font-size:11.5px; }
+
+  #tip { position:fixed; pointer-events:none; opacity:0; transition:opacity .1s;
+    background:var(--surface); border:1px solid var(--border); border-radius:5px; padding:8px 11px;
+    font-size:12px; box-shadow:0 4px 14px rgba(0,0,0,.16); z-index:99; font-variant-numeric:tabular-nums; max-width:250px; }
+  #tip .t1 { font-weight:650; margin-bottom:3px; }
+  #tip .t2 { color:var(--ink-2); }
+
+  .foot { margin-top:26px; padding-top:16px; border-top:1px solid var(--grid); font-size:12.5px; color:var(--ink-2); }
+  .foot b { color:var(--ink); }
+
+  @media (max-width:1080px){
+    .kpis{grid-template-columns:repeat(2,1fr);} .duo,.trio{grid-template-columns:1fr;}
+  }
+  @media (prefers-reduced-motion:reduce){ *{transition:none!important;} }
+</style>
+
+<div class="wrap">
+  <div class="head">
+    <div>
+      <h1>Rossmann Demand Patterns</h1>
+      <p class="sub">How the chain actually trades &mdash; when demand arrives, what moves it, and which stores behave differently. Everything here describes history that has already happened.</p>
+      <div class="unitnote" id="unitnote"></div>
+    </div>
+    <div class="stage">Stage 2 &middot; Patterns &middot; No forecast</div>
+  </div>
+
+  <div class="kpis" id="kpis"></div>
+
+  <div class="card full">
+    <h2>Average takings per trading store</h2>
+    <p class="lead" id="dailylead"></p>
+    <div id="dailychart"></div>
+    <div class="legend">
+      <span><i style="background:var(--faint)"></i>Daily average</span>
+      <span><i style="background:var(--s1)"></i>7-day trend</span>
+    </div>
+    <p class="take" id="dailytake"></p>
+  </div>
+
+  <div class="duo">
+    <div class="card">
+      <h2>Trade by day of week</h2>
+      <p class="lead">Average takings on days the store actually traded, with the share of stores open beneath.</p>
+      <div id="wkchart"></div>
+      <p class="take" id="wktake"></p>
+    </div>
+    <div class="card">
+      <h2>Spread of daily store takings</h2>
+      <p class="lead" id="distlead"></p>
+      <div id="distchart"></div>
+      <p class="take" id="disttake"></p>
+    </div>
+  </div>
+
+  <div class="duo">
+    <div class="card">
+      <h2>Open, closed and zero-sales days</h2>
+      <p class="lead">Closures are planned trading decisions, so they are not gaps to be filled in.</p>
+      <div class="ptw" id="ocbar"></div>
+      <div id="ockv"></div>
+      <div style="margin-top:14px" id="closeddow"></div>
+      <p class="take" id="octake"></p>
+    </div>
+    <div class="card">
+      <h2>Promotions</h2>
+      <p class="lead">Average takings on trading days with and without a promotion running.</p>
+      <div id="promochart"></div>
+      <p class="take pos" id="promotake"></p>
+    </div>
+  </div>
+
+  <div class="duo">
+    <div class="card">
+      <h2>Holidays</h2>
+      <p class="lead">Most stores shut on holidays; the figures below separate whether they open from how they trade when they do.</p>
+      <div id="holtbl"></div>
+      <p class="take alt" id="holtake"></p>
+    </div>
+    <div class="card">
+      <h2>School holidays</h2>
+      <p class="lead">Average takings on trading days inside and outside a school holiday.</p>
+      <div id="schoolchart"></div>
+      <p class="take" id="schooltake"></p>
+    </div>
+  </div>
+
+  <div class="duo">
+    <div class="card">
+      <h2>Store type</h2>
+      <p class="lead">Average daily takings by store format, with how many stores and how much of total revenue each carries.</p>
+      <div id="typechart"></div>
+      <p class="take" id="typetake"></p>
+    </div>
+    <div class="card">
+      <h2>Assortment</h2>
+      <p class="lead">Average daily takings by assortment level. The source files never define what a, b and c stand for, so they keep their raw codes.</p>
+      <div id="asrtchart"></div>
+      <p class="take" id="asrttake"></p>
+    </div>
+  </div>
+
+  <div class="duo">
+    <div class="card">
+      <h2>Highest-turnover stores</h2>
+      <p class="lead" id="toplead"></p>
+      <div id="topchart"></div>
+      <p class="take" id="toptake"></p>
+    </div>
+    <div class="card">
+      <h2>Least predictable stores</h2>
+      <p class="lead" id="vollead"></p>
+      <div id="volchart"></div>
+      <p class="take alt" id="voltake"></p>
+    </div>
+  </div>
+
+  <div class="foot" id="foot"></div>
+</div>
+<div id="tip"><div class="t1"></div><div class="t2"></div></div>
+
+<script>
+const D = {"kpi":{"total_sales":5873180623.0,"stores":1115,"rows":1017209,"trading_rows":844338,"promo_share":44.63556064040704,"closed_share":16.98933060954042,"zero_share":16.994639253093514,"zero_open":54,"zero_closed":172817,"mean_basket":6955.959133664481,"days":942},"daily":{"start":"2013-01-01","end":"2015-07-31","avg":[5719.7,6255.5,5723.9,5991.8,5376.3,7573.9,9789.2,7918.0,7010.5,7014.9,7275.4,5445.7,8002.9,5327.4,4988.8,4790.1,4870.3,5548.8,5429.3,7978.9,7914.2,7516.1,6997.8,6720.7,7022.4,5278.7,7142.4,5310.5,4925.6,5338.6,6385.3,6495.0,6115.2,9029.7,9318.0,7972.6,7299.2,6711.9,7185.4,5555.5,9586.9,5127.4,5030.3,5568.2,5791.1,5635.2,5551.5,9182.5,9634.2,7190.5,6984.5,6851.4,7051.2,5070.1,7952.9,5049.8,5100.0,5403.3,6393.0,6514.6,6096.5,9296.6,9966.4,8064.5,7270.5,7197.3,7320.2,5465.6,7853.2,5585.7,4813.7,5257.7,5498.7,6116.6,5824.2,8044.7,9071.3,7676.2,6956.7,7108.1,7422.1,5704.7,6822.7,9443.7,8383.3,8715.9,10286.5,13370.1,8443.2,5880.6,7776.6,6638.5,5776.8,5857.6,5971.2,5564.5,6099.9,9129.6,7597.9,6942.1,6841.5,7264.5,5432.2,5891.6,5149.8,5111.4,5010.5,5163.4,5725.8,5415.8,6280.2,8604.1,7256.5,6472.3,6421.5,6894.1,5688.3,6620.4,9053.4,9518.1,11165.1,8896.8,8071.4,5839.5,6260.5,6202.6,6034.0,6930.8,7773.8,7640.9,5988.0,6954.6,8836.8,7789.8,6985.4,7090.7,7397.3,5764.8,7316.4,7695.0,6484.7,5472.3,5584.1,5830.2,5221.7,6505.8,8942.9,7545.2,7990.2,7978.6,9814.6,6212.0,7442.0,9131.4,7668.0,6928.0,6895.1,7184.5,5399.8,7298.4,6001.3,5581.8,5365.5,5440.3,6199.3,5530.9,7260.2,9156.7,7277.9,6508.3,6606.7,7559.6,5566.0,7245.4,5855.4,5240.9,5421.0,5731.1,6863.3,6224.4,8135.0,9685.6,8051.0,7582.8,7627.0,7546.8,5334.9,7324.0,5988.3,5542.0,5624.2,5830.2,6024.7,5384.3,7924.4,10318.8,8228.2,7429.6,7271.1,7519.3,5333.8,7350.3,5642.4,5177.3,5356.2,5445.0,5629.0,4891.1,7263.8,10143.0,9034.6,9240.1,7891.7,7264.7,5679.1,7901.5,6442.0,5720.0,5763.2,5819.4,5909.7,5274.9,7604.9,9988.5,8232.7,7631.8,7322.4,7311.3,5017.6,7556.0,5742.2,5381.7,5118.5,5175.2,5423.1,4858.6,7036.9,9264.8,7551.3,7049.1,7167.7,8277.9,5802.4,7605.8,6152.0,5696.0,5392.6,5264.7,5514.8,5216.0,7046.9,9953.2,8052.9,7451.3,7280.6,7521.7,5295.9,7002.4,5508.5,5197.7,4881.7,5203.8,5424.4,5157.2,6380.1,8482.4,7111.7,6628.3,6716.9,7414.7,5600.9,6935.6,6877.0,5988.5,6429.5,7137.9,7351.2,5508.5,7009.5,9921.4,8026.1,7255.4,7004.3,7301.8,5563.8,7324.6,5893.6,5259.6,5321.8,5256.6,5667.8,5263.6,6721.5,8819.6,7109.9,6651.7,6617.6,6806.3,5152.2,7037.4,5230.3,5511.7,6251.1,7158.4,7256.9,6646.2,9770.2,9478.4,8346.7,7376.5,7131.7,7572.9,5889.5,11050.1,5761.2,5384.0,5406.9,5507.0,6046.6,5924.6,11447.9,9442.7,7978.4,7185.1,7250.6,7353.5,5913.1,11653.5,6461.7,5985.4,6031.8,6513.2,7895.3,7726.0,12943.1,11634.5,9789.6,9151.5,9234.8,7561.9,6485.3,10562.5,6822.9,6689.0,6605.0,6744.6,7185.9,7119.5,12590.1,14012.2,11707.6,10932.4,10529.4,11062.3,9116.9,9427.8,12870.0,4693.1,8387.4,9926.2,7326.1,6032.8,9062.1,9140.9,4067.1,6561.6,6260.6,6299.8,5701.6,8404.8,10706.7,9378.4,7751.8,7189.8,7667.0,5603.6,10337.9,5476.6,5203.1,5202.0,5153.4,5710.2,5602.4,10339.9,9593.5,7635.3,7180.4,6869.9,7067.5,5388.0,9420.8,5112.0,5202.7,5219.7,5672.1,7130.1,6230.2,11941.1,10564.0,8671.6,7598.4,7391.1,7255.5,5739.2,11189.8,5801.6,5446.8,5437.5,5557.9,6361.4,5649.6,11185.8,9582.9,7817.1,7052.0,6946.9,7051.4,5497.2,10278.1,5418.3,5114.4,5350.5,5396.6,7068.5,6357.8,11871.8,9460.1,8284.1,7895.0,7573.6,7611.0,5449.3,9355.5,5579.8,5311.2,5211.4,5309.5,5803.4,5679.6,7893.5,9281.5,7584.5,7059.3,6462.1,6914.2,5569.8,7250.6,5867.1,5328.7,5262.1,5427.7,6140.5,5624.5,6901.5,10828.5,8181.5,7470.3,7381.2,7704.4,5889.4,6973.8,5946.8,5608.8,5754.2,5851.6,6197.5,5729.2,7789.5,10478.2,9568.0,8990.9,9289.2,13080.3,7558.8,5837.5,7530.9,6258.3,5383.9,5421.1,5583.4,5357.7,6863.4,9576.2,8489.3,9731.6,11903.9,10153.2,6149.3,6894.1,9683.5,8138.0,7586.9,7501.4,7830.0,6129.3,7588.0,5730.3,5501.5,5512.6,5613.0,5848.4,5433.3,7337.1,9070.3,7425.3,6942.5,6754.5,7346.8,5508.4,7003.0,5830.6,5647.9,7137.8,9427.5,8847.2,6187.6,8020.3,10488.0,8631.8,7920.3,7924.7,7957.9,6047.8,8624.7,8475.9,6663.1,6009.7,6234.7,6350.7,5906.7,7446.0,9606.5,8351.4,8139.7,7710.4,8700.3,5449.9,7208.4,5939.7,5437.4,5380.6,5222.8,6214.9,5923.1,8047.3,11968.2,8841.3,8271.0,7738.6,7001.8,5769.5,7787.8,6501.7,5492.9,5321.3,6147.3,6214.2,5743.1,8649.4,9285.6,8290.2,7743.1,7375.6,7170.8,5058.5,8003.0,6138.9,5690.0,5467.9,5592.9,5900.6,5249.6,7891.5,9169.6,7866.3,8022.2,8908.3,8095.2,5687.2,8808.3,9724.0,8079.8,7199.2,7266.8,7043.8,5293.6,8053.1,6271.1,5661.1,5519.7,5782.4,5990.5,5376.4,8251.9,9904.7,8242.5,7519.1,7083.7,7130.3,5331.2,8027.0,6177.0,5431.1,5556.2,5758.7,7071.9,6080.9,8867.2,10492.7,8464.2,7726.4,7335.3,7436.8,5387.9,7358.5,6081.0,5661.9,5613.6,5686.6,5879.6,5509.2,7856.2,9360.9,7715.8,6989.0,6864.2,7028.5,5268.7,7816.2,5656.6,5334.5,5145.6,5320.8,5696.7,5327.0,6895.1,9152.3,9522.3,8246.6,8732.1,7897.1,6880.2,7526.5,9656.3,7842.5,7355.2,7290.7,7537.3,5551.0,8014.1,5824.6,5576.2,5465.7,5539.5,5828.5,5289.6,6833.0,8640.5,7141.6,6556.0,6912.9,6976.8,5235.0,7312.0,5891.3,5528.6,5652.4,6707.9,7909.9,6498.9,12573.0,10645.8,8750.0,8013.9,7683.5,7805.6,6020.8,10457.3,8658.1,7575.6,7151.2,7219.4,7556.0,5964.1,12715.8,6256.4,5740.7,5684.6,5969.9,6220.9,5906.4,12393.6,9647.4,8415.8,8040.9,8414.4,9810.4,7813.4,14238.6,10991.4,9458.6,8832.1,9148.7,10483.3,6929.8,12279.3,7016.1,6769.8,6320.6,6585.0,6953.2,7250.5,13666.9,12976.9,11359.4,10142.7,10490.1,10180.2,8509.5,9601.8,11772.9,11456.8,4933.4,9711.6,10802.0,6107.3,9481.3,7798.3,8198.7,4166.4,7231.2,6781.6,5516.0,8963.3,10137.9,8394.9,7732.6,6858.0,7125.9,5630.3,10786.3,8825.7,7657.9,7068.8,6973.0,7584.0,5852.6,11516.4,5732.8,5156.3,5280.1,5326.7,5678.8,5216.7,10531.1,8439.7,7533.5,7118.5,7202.9,8487.4,6602.0,12530.9,9238.0,7993.4,7310.0,7164.3,7569.3,5914.5,12247.6,5809.1,5690.7,5734.1,5521.6,6468.5,6010.2,12069.8,8607.6,7470.3,7246.8,7215.8,7272.6,5652.2,11730.5,5377.3,5410.6,5416.3,5814.7,6989.2,6668.2,12049.6,9823.1,8297.3,7566.6,7424.4,7641.1,5898.5,10067.0,6078.2,5580.4,5640.3,5734.0,6242.9,5953.3,8150.2,9773.0,7900.2,7188.2,7254.2,7442.6,5748.5,7608.1,6094.1,5589.2,5452.2,5711.6,6348.0,6124.7,7070.1,11095.5,10065.4,9957.0,10224.6,14263.1,8400.5,6787.8,8528.8,7081.8,6090.3,5899.7,5981.4,5780.7,7654.9,9932.7,8220.7,7190.0,7530.7,7837.1,5891.6,7416.9,5909.3,5416.6,5454.9,5518.9,5710.8,5655.1,7315.4,9511.7,8351.0,8536.1,10159.5,13211.5,7861.0,7551.7,9870.7,7887.6,7757.0,7675.6,7778.7,6424.7,7866.2,6043.7,6002.0,7314.1,9039.0,7716.8,5827.7,7990.0,9509.6,8005.4,7493.7,7379.7,7490.8,6075.2,8168.3,9074.9,6974.4,6167.2,6255.4,7509.3,6768.4,8709.1,10532.4,8901.5,8735.9,8181.1,8721.9,5810.3,7954.5,6607.0,6157.8,5851.8,5877.2,5930.4,5844.0,8422.9,10386.1,8650.6,7736.5,7353.1,7592.7,5736.7,7807.8,5882.0,5648.4,5617.1,5576.1,5950.4,5864.0,8208.4,10687.6,10299.5,8062.5,7582.0,7657.4,5434.7,8159.0,6768.8,5738.8,6207.9,6228.2,6341.9,5626.3,8657.7,9740.6,8392.1,7867.1,7530.5,7148.7,5794.2,9325.6,6594.2,5711.1,5490.0,6008.1,5931.1,5410.3,8933.3,9620.2,8189.6,7637.0,7905.5,9083.3],"roll7":[5719.7,5987.6,5899.7,5922.7,5813.5,6106.9,6632.9,6947.0,7054.8,7239.2,7422.6,7432.5,7493.8,6856.4,6437.9,6120.7,5814.4,5567.7,5565.4,5561.9,5931.5,6292.5,6607.9,6872.3,7082.8,7061.3,6941.8,6569.8,6199.7,5962.7,5914.8,5839.4,5958.9,6228.6,6801.1,7236.3,7516.4,7563.1,7661.7,7581.7,7661.3,7062.7,6642.4,6395.1,6263.5,6042.1,6041.5,5983.7,6627.6,6936.2,7138.5,7290.0,7492.3,7423.5,7247.8,6592.9,6294.3,6068.4,6002.9,5926.2,6072.9,6264.8,6967.2,7390.7,7657.4,7772.3,7887.4,7797.3,7591.1,6965.3,6500.9,6213.3,5970.7,5798.8,5850.0,5877.3,6375.3,6784.2,7026.9,7256.8,7443.3,7426.3,7251.7,7304.9,7405.9,7657.2,8111.3,8961.0,9352.2,9217.6,8979.5,8730.2,8310.3,7677.6,6620.6,6209.4,6240.7,6434.0,6571.1,6737.6,6878.1,7062.9,7044.0,7014.2,6445.7,6090.5,5814.5,5574.8,5355.0,5352.6,5408.1,5901.6,6208.1,6416.9,6596.6,6763.5,6802.4,6851.0,6915.2,7238.3,7908.7,8262.3,8430.5,8452.1,8400.7,7993.4,7495.7,6890.8,6730.4,6668.9,6690.1,6789.3,7165.6,7416.4,7424.2,7326.6,7291.8,7259.9,7311.6,7148.5,6962.1,6745.9,6530.7,6306.8,6229.2,6113.4,6291.7,6443.2,6802.9,7145.0,7714.2,7855.6,7989.4,8016.3,8033.8,7882.1,7727.3,7351.6,7235.6,7215.0,6767.9,6469.9,6246.6,6038.8,5898.1,5916.8,5911.3,6362.1,6604.4,6767.7,6934.3,7128.6,7133.6,7131.5,6659.9,6368.9,6213.6,6088.5,5989.0,6083.1,6210.2,6757.3,7158.8,7467.6,7738.4,7836.1,7709.0,7593.2,7065.0,6706.5,6426.7,6170.1,5952.6,5959.7,6045.4,6664.1,7047.8,7305.7,7511.6,7725.1,7717.9,7635.9,6967.8,6532.0,6235.8,5974.9,5704.9,5641.6,5629.2,6272.2,6823.2,7378.1,7727.6,7961.3,8073.9,8165.0,7636.2,7162.7,6666.0,6370.0,6176.4,6118.7,6076.3,6583.0,6941.9,7208.9,7423.6,7623.8,7587.0,7580.1,6973.4,6566.2,6207.1,5900.4,5630.6,5607.9,5533.8,6037.0,6346.9,6622.7,6907.4,7315.2,7450.0,7531.3,7086.6,6821.5,6584.9,6313.1,5918.3,5834.6,5754.7,6297.7,6634.4,6928.5,7216.5,7503.2,7514.6,7508.3,6873.3,6465.4,6098.3,5801.7,5502.0,5482.2,5393.3,5818.2,6091.6,6341.1,6557.3,6841.6,6905.0,6984.4,6755.0,6594.6,6566.2,6626.3,6617.3,6604.1,6614.6,7049.5,7340.6,7458.6,7439.5,7432.4,7440.3,7485.4,6910.0,6514.7,6238.5,5988.9,5755.4,5712.5,5626.4,6044.4,6308.7,6498.7,6693.1,6855.8,6839.9,6885.0,6372.2,6143.9,6086.7,6163.9,6228.3,6441.7,6832.1,7439.0,7844.0,8004.8,8000.9,8046.1,7938.0,8120.8,7589.8,7166.6,6885.2,6653.1,6435.0,6440.1,6496.9,7022.8,7393.5,7647.5,7896.6,8083.3,8081.6,8111.0,7685.1,7400.4,7235.6,7130.3,7207.7,7466.7,7650.9,8389.9,8933.4,9379.0,9767.8,9720.2,9542.9,9202.9,8515.5,8072.5,7708.8,7353.0,7299.3,7389.9,7679.6,8706.6,9423.6,10041.8,10582.5,11136.2,11421.6,10969.8,10806.6,9804.6,9441.0,9354.8,8821.1,8380.5,8328.2,7795.5,7706.1,7445.3,6921.6,6775.0,6727.7,6633.8,6857.4,7616.2,7786.2,7919.0,8114.3,8100.3,8376.5,7629.3,7032.8,6668.6,6377.6,6098.1,6097.9,6098.2,6686.4,7033.8,7316.5,7561.7,7755.6,7724.9,7593.6,6953.4,6605.9,6325.8,6154.7,6163.6,6283.9,6644.0,7422.8,7918.4,8258.2,8503.8,8521.7,8451.5,8344.2,7663.9,7203.2,6894.5,6632.6,6504.9,6492.1,6491.5,7031.7,7370.3,7601.0,7799.4,7898.0,7876.2,7746.5,7151.6,6765.5,6522.4,6300.9,6303.4,6426.3,6654.0,7231.4,7684.2,8047.7,8358.7,8436.2,8306.4,7947.0,7392.6,6967.9,6584.5,6261.1,6002.9,6035.8,5826.9,6355.7,6680.5,6944.5,7109.1,7267.8,7252.1,7160.3,6672.5,6350.3,6093.5,5945.7,5835.2,5843.0,5793.2,6501.9,6909.5,7224.9,7504.0,7727.4,7765.3,7775.6,7078.2,6710.7,6465.5,6247.0,6031.7,6008.9,6125.4,6772.7,7338.3,7800.7,8291.8,9275.0,9536.4,9257.5,8836.5,8363.7,7848.4,7295.8,6224.8,5910.4,6057.0,6349.2,6667.9,7289.0,8215.1,8867.9,8981.0,8985.4,9000.7,8950.5,8644.1,8015.2,7683.3,7680.5,7779.6,7214.8,6838.2,6541.9,6272.1,5989.0,5889.6,5853.7,6330.9,6605.7,6810.0,6973.1,7187.1,7197.8,7150.1,6687.3,6433.4,6461.3,6843.2,7057.5,7154.5,7299.8,7965.2,8391.5,8503.2,8288.6,8161.5,8141.5,8227.9,7940.4,7659.2,7386.3,7144.8,6915.2,6895.1,6726.7,6888.2,7129.4,7433.7,7644.5,7980.2,7914.9,7881.0,7357.1,6940.8,6546.7,6191.3,5836.2,5903.8,6023.7,6884.9,7371.1,7784.1,8143.5,8255.9,8234.0,8196.9,7416.0,6937.6,6516.3,6288.9,6176.4,6172.6,6295.7,6693.4,7093.0,7439.0,7614.4,7751.1,7653.3,7561.0,7111.4,6740.0,6415.0,6160.3,5978.8,6006.1,5990.2,6423.2,6734.1,7099.0,7572.6,7886.1,7948.6,8079.6,8158.8,8189.3,8071.7,7837.2,7687.0,7630.8,7522.9,7029.6,6684.1,6444.2,6232.1,6081.6,6093.5,6121.9,6641.0,7009.7,7295.3,7481.2,7644.1,7637.6,7605.5,7073.0,6671.3,6390.9,6201.7,6193.3,6300.4,6420.4,7037.0,7470.3,7780.3,8005.5,8057.6,7958.6,7743.1,7112.9,6712.5,6410.7,6175.2,5952.7,5970.1,6041.1,6509.7,6803.1,6999.6,7167.8,7332.0,7297.6,7291.9,6762.7,6422.5,6159.2,5938.7,5748.4,5756.8,5625.2,6124.6,6722.8,7165.8,7653.2,7967.5,8189.4,8279.6,8351.6,8111.6,7984.3,7778.4,7727.0,7537.1,7606.7,7059.4,6735.6,6465.7,6215.5,5971.4,5934.0,5765.3,6167.6,6391.2,6546.9,6743.2,6907.2,6899.4,6967.8,6575.1,6344.7,6215.6,6186.3,6319.6,6500.1,7251.7,7930.9,8391.1,8728.5,8867.8,8853.0,8784.7,8482.4,8198.5,8030.7,7907.4,7841.1,7805.5,7797.4,8120.0,7776.9,7514.8,7305.3,7126.8,6936.1,6927.8,6881.8,7366.2,7748.4,8085.0,8434.2,8947.0,9219.4,9483.0,9675.0,9824.0,9937.0,10041.9,10138.0,10011.8,9731.9,9164.0,8779.9,8421.1,8054.8,7550.5,7596.3,7794.6,8646.1,9301.8,9847.8,10405.7,10866.7,11046.5,10465.8,10293.8,10307.7,9563.5,9452.3,9541.1,9198.0,9180.8,8613.0,8147.5,8037.9,7683.6,7109.3,7024.8,6950.8,7285.0,7313.0,7822.5,7769.2,7818.4,7834.7,8095.1,7907.7,7802.4,7707.5,7724.0,7789.4,7821.2,7925.5,7483.7,7126.3,6870.8,6635.6,6363.4,6272.5,6131.8,6518.5,6858.1,7120.7,7388.7,7790.0,7987.9,8273.6,8387.6,8453.3,8480.7,8475.2,8344.0,8245.8,8205.3,7715.5,7386.5,7161.4,6926.7,6769.4,6783.1,6757.7,7157.5,7411.7,7627.8,7869.8,7984.7,7933.6,7885.1,7423.6,7129.4,6867.9,6667.8,6627.3,6772.4,6818.0,7453.1,7865.5,8172.7,8402.6,8495.8,8385.8,8102.6,7567.6,7179.5,6904.3,6662.8,6463.1,6470.9,6197.0,6724.9,7056.3,7277.4,7494.5,7665.9,7636.7,7559.3,7033.7,6703.6,6455.6,6235.2,6078.8,6132.6,6055.7,6770.2,7409.6,8053.2,8697.9,9828.6,10153.7,10113.4,9746.7,9320.5,8768.1,8150.3,6967.2,6592.9,6716.8,6917.3,7080.1,7237.2,7470.2,7735.3,7751.1,7717.1,7142.3,6741.7,6493.9,6206.5,5902.7,5868.9,5854.4,6369.0,6788.2,7228.4,7891.4,8962.9,9278.0,9311.8,9363.1,9296.9,9185.6,8830.7,8054.6,7849.4,7894.4,7347.6,7078.3,7015.0,7209.8,7200.9,7115.6,7133.3,7628.5,7914.7,7940.3,7703.3,7671.0,7706.4,7731.8,7669.7,7522.4,7332.9,7172.3,7174.9,7274.0,7351.2,7559.4,7834.8,8201.7,8476.8,8650.0,8513.2,8405.4,7844.6,7452.6,7040.6,6711.5,6312.7,6317.5,6384.4,6924.3,7280.4,7549.7,7760.5,7998.0,7982.7,7894.8,7251.3,6822.5,6519.7,6265.8,6031.2,6049.4,6106.6,6793.1,7457.6,7806.9,8093.5,8337.3,8276.0,8269.0,7709.1,7057.6,6792.7,6599.3,6411.3,6438.7,6509.9,6934.5,7313.5,7550.6,7736.6,7851.8,7875.8,7971.3,7521.8,7138.8,6799.2,6581.7,6407.8,6352.9,6296.9,6729.2,7083.2,7390.0,7661.0,8111.3],"open_stores":[17,1111,1109,1108,1107,19,1106,1105,1105,1105,1105,1105,18,1105,1105,1105,1106,1106,1107,19,1107,1107,1107,1107,1108,1108,20,1107,1107,1107,1107,1109,1109,19,1109,1109,1109,1107,1109,1109,18,1076,1106,1109,1109,1110,1110,19,1111,1111,1111,1111,1112,1112,20,1112,1112,1112,1112,1112,1112,21,1111,1109,1109,1109,1109,1109,21,1109,1109,1109,1109,1109,1109,24,1111,1111,1111,1111,1111,1111,28,1110,1110,1110,1110,16,1111,30,31,1109,1109,1109,1109,1109,31,1108,1108,1109,1108,1109,1109,31,1109,1109,1109,1109,1109,1109,30,1109,1109,1109,1109,1110,1109,31,1109,1110,18,1111,1111,1111,32,1110,1110,1110,30,1110,1112,31,1112,1112,1112,1112,1112,1112,31,33,1111,1112,1112,1112,1112,31,1112,1112,1112,429,1112,1112,32,1111,1112,1109,1109,1109,1110,31,1111,1111,1111,1111,1111,1111,31,1113,1113,1113,1113,1112,1112,31,1112,1112,1112,1112,1111,1110,31,1110,1110,1110,1109,1111,1111,32,1111,1111,1111,1112,1112,1112,32,1113,1113,1113,1113,1114,1114,32,1114,1114,1114,1114,1114,1114,32,1114,1114,1114,1113,1113,1113,32,1113,1113,1113,1105,1115,1115,32,1115,1115,1115,960,1113,1113,32,1113,1113,1113,1113,1113,1111,32,1112,1112,1112,1112,1114,1113,33,1111,1110,1110,1110,1110,1111,32,1111,1111,1112,1112,1113,1113,32,1113,1113,1114,1114,1114,1114,32,1114,1114,1115,1115,1115,1115,33,1114,1115,1115,40,1115,1115,31,1115,1115,1115,1115,1115,1115,31,1115,1115,1115,1115,1115,1115,31,1115,1115,1115,1115,1115,1115,31,1115,1115,1115,951,543,1115,18,1115,1115,1115,1115,1115,1115,17,1115,1115,1115,1115,1115,1115,17,1115,1115,1040,1115,1115,1115,17,1115,1115,1115,1115,1115,1115,17,1115,1115,1115,1115,1115,1115,18,1115,1115,1115,1115,1115,1115,17,1115,1115,1115,1115,1115,1115,28,1115,1115,17,19,1115,1115,25,1115,1115,18,1115,1115,1115,22,809,1115,1115,1115,1115,1112,17,1112,1112,1111,1110,1109,1109,17,1110,1110,1110,1110,1111,1111,17,1113,1113,1113,1113,1113,1113,18,1113,1113,1113,1113,1113,1113,17,1112,1112,1112,1112,1114,1114,17,1114,1114,1114,1114,1115,1114,18,1114,1114,1114,1113,1114,1115,19,1084,1112,1115,1115,1115,1115,20,1112,1112,1112,1111,1111,1111,27,1111,1111,1112,1111,1111,1109,30,1109,1109,1110,1110,1111,1111,30,1114,1114,1113,1113,1113,1114,32,1114,1114,1114,1115,1115,1115,31,1115,1115,1115,1115,17,1115,32,32,1114,1114,1114,1114,1114,32,1114,1114,1114,20,1114,1114,33,1115,1115,1114,1114,1114,1114,32,1114,1114,1114,1114,1114,1114,32,1114,1113,1113,1113,1113,1113,32,1113,1113,1113,31,1113,1112,33,1112,1112,1112,1112,1113,1113,32,34,1113,1113,1113,1113,1113,32,1113,1113,1113,429,1113,1113,32,1112,1111,1111,1111,1112,1112,32,1112,932,932,931,931,932,31,932,932,932,932,932,928,31,927,927,927,927,927,927,31,927,927,927,926,931,931,31,931,931,931,930,932,932,31,932,932,932,932,933,933,31,933,933,933,933,934,934,31,934,934,934,934,931,930,31,931,931,930,930,928,928,31,928,928,928,927,929,930,31,930,929,930,930,932,932,31,932,932,932,932,932,933,31,933,933,934,934,934,934,32,934,934,934,934,39,934,30,935,935,934,935,935,935,30,935,935,935,935,935,935,30,935,935,935,935,935,935,30,935,934,935,935,772,542,17,935,935,935,935,935,935,17,935,935,935,935,935,935,16,935,935,860,934,935,935,16,935,935,935,935,935,935,17,935,935,935,935,935,935,16,935,935,935,935,935,935,16,935,935,935,935,935,935,27,935,935,935,16,19,935,23,935,935,935,18,1115,1115,22,1115,809,1115,1115,1115,1115,17,1115,1115,1115,1115,1115,1115,17,1114,1114,1114,1114,1114,1114,17,1114,1114,1114,1114,1114,1114,18,1114,1114,1113,1113,1115,1115,17,1115,1115,1115,1114,1115,1115,18,1083,1111,1112,1113,1113,1113,17,1113,1113,1113,1113,1113,1113,19,1113,1113,1113,1113,1113,1113,20,1113,1113,1112,1112,1112,1113,30,1113,1113,1112,1113,1114,1113,31,1114,1114,1114,1114,1115,1115,32,1115,1115,1115,1115,17,1115,32,32,1115,1115,1112,1115,1115,32,1115,1115,1113,1115,1115,1115,32,1115,1115,1115,1115,1115,1115,32,1115,1114,1115,1115,20,1115,33,1114,1113,1113,1114,1114,1114,32,1114,1114,1114,32,1114,1115,32,1115,1115,1115,1115,1115,1115,32,33,1115,1115,1115,1115,1115,32,1115,1115,1114,432,1115,1115,33,1115,1115,1115,1115,1114,1114,32,1114,1114,1114,1114,1114,1114,32,1114,1114,1114,1114,1115,1115,32,1115,1115,1115,1114,1114,1114,33,1114,1114,1114,1114,1114,1113,32,1113,1113,1113,1112,1112,1113,32,1113,1113,1113,1113,1113,1113,32,1113,1113,1113,1113,1113],"panel_max":1115,"sparse_days":163,"median":7059.3,"peak_full":{"date":"2013-12-16","avg":14012.2,"stores":1115}},"weekday":[{"dow":1,"name":"Mon","avg":8216.3,"open_rate":95.0,"n":144730,"trading":137557},{"dow":2,"name":"Tue","avg":7088.4,"open_rate":98.8,"n":145664,"trading":143955},{"dow":3,"name":"Wed","avg":6728.8,"open_rate":97.4,"n":145665,"trading":141922},{"dow":4,"name":"Thu","avg":6768.2,"open_rate":92.3,"n":145845,"trading":134626},{"dow":5,"name":"Fri","avg":7073.0,"open_rate":95.1,"n":145845,"trading":138633},{"dow":6,"name":"Sat","avg":5875.1,"open_rate":99.5,"n":144730,"trading":144052},{"dow":7,"name":"Sun","avg":8224.7,"open_rate":2.5,"n":144730,"trading":3593}],"dist":{"bins":[7,234,1496,4015,9566,18049,29589,44400,56898,65872,70561,71105,67456,60837,54602,48424,40780,34284,28693,23783,20000,16173,13373,10747,8645,7053,5715,4860,3996,3394,2789,2343,2118,1770,1483,1289,1197,998,916,728,639,557,450,2454],"max":22000,"median":6369.0,"p10":3762.0,"p90":10771.0,"p99":17789.0,"mean":6956.0,"min":46.0,"hi":41551.0},"openclosed":{"open":844392,"closed":172817,"zero_total":172871,"zero_open":54,"zero_closed":172817,"closed_nonzero":0,"n":1017209},"closed_by_dow":[{"name":"Mon","n":7170},{"name":"Tue","n":1703},{"name":"Wed","n":3729},{"name":"Thu","n":11201},{"name":"Fri","n":7205},{"name":"Sat","n":672},{"name":"Sun","n":141137}],"promo":{"yes_avg":8228.7,"no_avg":5929.8,"yes_n":376875,"no_n":467463,"uplift":38.8},"school":{"yes_avg":7200.7,"no_avg":6897.2,"yes_n":163445,"no_n":680893,"uplift":4.4},"holiday":[{"code":"0","name":"Normal day","n":986159,"open_rate":85.5,"avg":6954.0},{"code":"a","name":"Public holiday","n":20260,"open_rate":3.4,"avg":8487.5},{"code":"b","name":"Easter","n":6690,"open_rate":2.2,"avg":9887.9},{"code":"c","name":"Christmas","n":4100,"open_rate":1.7,"avg":9743.7}],"storetype":[{"key":"a","name":"Type a","avg":6925.7,"stores":602,"share":53.9},{"key":"b","name":"Type b","avg":10233.4,"stores":17,"share":2.7},{"key":"c","name":"Type c","avg":6933.1,"stores":148,"share":13.3},{"key":"d","name":"Type d","avg":6822.3,"stores":348,"share":30.1}],"assortment":[{"key":"a","name":"Assortment a","avg":6621.5,"stores":593,"share":50.2},{"key":"b","name":"Assortment b","avg":8642.5,"stores":9,"share":1.2},{"key":"c","name":"Assortment c","avg":7300.8,"stores":513,"share":48.6}],"top_stores":[{"store":817,"avg":21757.5,"sd":4674.8,"cv":21.5,"days":784,"type":"a","assort":"a"},{"store":262,"avg":20718.5,"sd":4668.9,"cv":22.5,"days":942,"type":"b","assort":"a"},{"store":1114,"avg":20666.6,"sd":3452.9,"cv":16.7,"days":784,"type":"a","assort":"c"},{"store":251,"avg":19123.1,"sd":3547.6,"cv":18.6,"days":779,"type":"a","assort":"c"},{"store":842,"avg":18574.8,"sd":3789.0,"cv":20.4,"days":622,"type":"d","assort":"c"},{"store":513,"avg":18179.1,"sd":3284.6,"cv":18.1,"days":784,"type":"a","assort":"a"},{"store":562,"avg":17969.6,"sd":2931.9,"cv":16.3,"days":942,"type":"b","assort":"c"},{"store":788,"avg":17961.9,"sd":3150.6,"cv":17.5,"days":784,"type":"a","assort":"c"},{"store":383,"avg":17294.7,"sd":2785.8,"cv":16.1,"days":780,"type":"a","assort":"c"},{"store":756,"avg":16574.8,"sd":3912.6,"cv":23.6,"days":779,"type":"a","assort":"c"}],"volatile":[{"store":198,"avg":2900.6,"sd":1597.8,"cv":55.1,"days":782,"type":"a","assort":"a"},{"store":897,"avg":3492.9,"sd":1810.5,"cv":51.8,"days":778,"type":"c","assort":"c"},{"store":607,"avg":3901.9,"sd":1879.6,"cv":48.2,"days":782,"type":"a","assort":"a"},{"store":126,"avg":6507.8,"sd":3049.5,"cv":46.9,"days":779,"type":"d","assort":"a"},{"store":575,"avg":5367.6,"sd":2472.7,"cv":46.1,"days":623,"type":"a","assort":"a"},{"store":708,"avg":4578.6,"sd":2064.4,"cv":45.1,"days":687,"type":"c","assort":"c"},{"store":589,"avg":4678.8,"sd":2107.8,"cv":45.0,"days":756,"type":"a","assort":"c"},{"store":543,"avg":2790.4,"sd":1237.7,"cv":44.4,"days":781,"type":"c","assort":"a"},{"store":876,"avg":9228.9,"sd":4079.7,"cv":44.2,"days":766,"type":"a","assort":"a"},{"store":271,"avg":7841.7,"sd":3439.8,"cv":43.9,"days":780,"type":"a","assort":"a"}],"steady":[{"store":260,"avg":6560.0,"sd":809.6,"cv":12.3,"days":784,"type":"a","assort":"a"},{"store":733,"avg":14933.3,"sd":1838.0,"cv":12.3,"days":942,"type":"b","assort":"b"},{"store":760,"avg":7638.4,"sd":1018.9,"cv":13.3,"days":777,"type":"a","assort":"a"}],"chain":{"avg":6934.6,"cv":27.2,"n":1115,"min_days":300}};
+const $ = s => document.querySelector(s);
+const el = (t,c,h) => { const e=document.createElement(t); if(c)e.className=c; if(h!==undefined)e.innerHTML=h; return e; };
+const SVGNS='http://www.w3.org/2000/svg';
+const svg=(t,a={})=>{const e=document.createElementNS(SVGNS,t);for(const k in a)e.setAttribute(k,a[k]);return e;};
+const n0 = v => Math.round(v).toLocaleString('en-US');
+const n1 = v => v.toFixed(1);
+const big = v => v>=1e9 ? (v/1e9).toFixed(2)+'bn' : v>=1e6 ? (v/1e6).toFixed(1)+'m' : n0(v);
+
+const tip=$('#tip');
+function showTip(e,t1,t2){
+  tip.querySelector('.t1').textContent=t1; tip.querySelector('.t2').innerHTML=t2;
+  tip.style.opacity=1;
+  const r=tip.getBoundingClientRect();
+  let x=e.clientX+14,y=e.clientY-10;
+  if(x+r.width>innerWidth-8)x=e.clientX-r.width-14;
+  if(y+r.height>innerHeight-8)y=innerHeight-r.height-8;
+  tip.style.left=x+'px'; tip.style.top=y+'px';
+}
+const hideTip=()=>tip.style.opacity=0;
+
+$('#unitnote').textContent =
+  `${n0(D.kpi.rows)} store-days · ${D.daily.start} to ${D.daily.end} · sales are in the source file's unlabelled currency unit`;
+
+/* ---------- KPI strip ---------- */
+[['Total sales',big(D.kpi.total_sales),'',`${n0(D.kpi.days)} days, ${n0(D.kpi.stores)} stores`],
+ ['Active stores',n0(D.kpi.stores),'',`${n0(D.kpi.trading_rows)} trading store-days`],
+ ['Promo share',n1(D.kpi.promo_share),'%',`of trading days run a promotion`],
+ ['Closed-day share',n1(D.kpi.closed_share),'%',`${Math.round(100*D.closed_by_dow[6].n/D.openclosed.closed)}% of closures are Sundays`],
+ ['Zero-sales share',n1(D.kpi.zero_share),'%',`all but ${D.kpi.zero_open} are closed days`]
+].forEach(([lab,val,suf,sub])=>{
+  const k=el('div','kpi');
+  k.appendChild(el('div','lab',lab));
+  k.appendChild(el('div','val',val+(suf?`<em>${suf}</em>`:'')));
+  k.appendChild(el('div','sub2',sub));
+  $('#kpis').appendChild(k);
+});
+
+/* ---------- daily series ---------- */
+(function(){
+  const a=D.daily.avg, r=D.daily.roll7, N=a.length;
+  const W=1480,H=230,ML=52,MR=14,MT=12,MB=26;
+  const yMax=Math.ceil(Math.max(...a)/2500)*2500;
+  const x=i=>ML+(i/(N-1))*(W-ML-MR);
+  const y=v=>MT+(1-v/yMax)*(H-MT-MB);
+  const s=svg('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Average takings per trading store for each day of the training history'});
+
+  for(let v=0;v<=yMax;v+=2500){
+    s.appendChild(svg('line',{x1:ML,x2:W-MR,y1:y(v),y2:y(v),class:'gl'}));
+    const t=svg('text',{x:ML-8,y:y(v)+3.5,class:'axtxt','text-anchor':'end'}); t.textContent=n0(v); s.appendChild(t);
+  }
+  const d0=new Date(D.daily.start+'T00:00:00Z');
+  const dateAt=i=>{const d=new Date(d0);d.setUTCDate(d.getUTCDate()+i);return d;};
+  for(let i=0;i<N;i++){
+    const d=dateAt(i);
+    if(d.getUTCDate()===1&&d.getUTCMonth()%3===0){
+      s.appendChild(svg('line',{x1:x(i),x2:x(i),y1:MT,y2:H-MB,class:'gl'}));
+      const t=svg('text',{x:x(i),y:H-MB+15,class:'axtxt','text-anchor':'middle'});
+      t.textContent=d.toLocaleDateString('en-US',{month:'short',year:'2-digit',timeZone:'UTC'});
+      s.appendChild(t);
+    }
+  }
+  let ap=`M${x(0)} ${H-MB}`; a.forEach((v,i)=>ap+=`L${x(i).toFixed(1)} ${y(v).toFixed(1)}`);
+  ap+=`L${x(N-1)} ${H-MB}Z`;
+  s.appendChild(svg('path',{d:ap,fill:'var(--s1)',opacity:.07}));
+  let dp=''; a.forEach((v,i)=>dp+=(i?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1));
+  s.appendChild(svg('path',{d:dp,fill:'none',stroke:'var(--faint)','stroke-width':1}));
+  let rp=''; r.forEach((v,i)=>rp+=(i?'L':'M')+x(i).toFixed(1)+' '+y(v).toFixed(1));
+  s.appendChild(svg('path',{d:rp,fill:'none',stroke:'var(--s1)','stroke-width':2,'stroke-linejoin':'round'}));
+  s.appendChild(svg('line',{x1:ML,x2:W-MR,y1:H-MB,y2:H-MB,class:'base'}));
+
+  const cross=svg('line',{x1:0,x2:0,y1:MT,y2:H-MB,stroke:'var(--ink-muted)','stroke-width':1,opacity:0});
+  const mk=svg('circle',{r:4,fill:'var(--s1)',stroke:'var(--surface)','stroke-width':2,opacity:0});
+  s.appendChild(cross); s.appendChild(mk);
+  const hit=svg('rect',{x:ML,y:MT,width:W-ML-MR,height:H-MT-MB,fill:'transparent'});
+  hit.addEventListener('mousemove',ev=>{
+    const bb=s.getBoundingClientRect(), px=(ev.clientX-bb.left)/bb.width*W;
+    let i=Math.round((px-ML)/(W-ML-MR)*(N-1)); i=Math.max(0,Math.min(N-1,i));
+    cross.setAttribute('x1',x(i));cross.setAttribute('x2',x(i));cross.setAttribute('opacity',.5);
+    mk.setAttribute('cx',x(i));mk.setAttribute('cy',y(a[i]));mk.setAttribute('opacity',1);
+    showTip(ev,dateAt(i).toISOString().slice(0,10),
+      `${n0(a[i])} per store &middot; 7-day ${n0(r[i])}<br>${n0(D.daily.open_stores[i])} stores trading`);
+  });
+  hit.addEventListener('mouseleave',()=>{cross.setAttribute('opacity',0);mk.setAttribute('opacity',0);hideTip();});
+  s.appendChild(hit);
+  $('#dailychart').appendChild(s);
+})();
+
+$('#dailylead').innerHTML=`Charted per <b>trading store</b> rather than as a chain total: 180 stores leave the panel for 184 days in 2014, `+
+  `and a raw total would read that absence as a demand collapse. The isolated single-day spikes are public holidays when only a `+
+  `handful of stores open, so read the 7-day trend, not the thin line.`;
+(function(){
+  const p=D.daily.peak_full, med=D.daily.median;
+  $('#dailytake').innerHTML=`<b>Takeaway:</b> a typical day turns over ${n0(med)} per store and the genuine chain-wide peak is `+
+    `${n0(p.avg)} on ${p.date}, when all ${n0(p.stores)} stores traded &mdash; about ${(p.avg/med).toFixed(1)}&times; normal, and December `+
+    `does it every year, so the run-up to Christmas needs its own stock and staffing plan rather than a flat weekly rule.`;
+})();
+
+/* ---------- weekday ---------- */
+(function(){
+  const w=D.weekday, W=560,H=190,ML=48,MR=10,MT=10,MB=44;
+  const yMax=Math.ceil(Math.max(...w.map(d=>d.avg))/2000)*2000;
+  const s=svg('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Average takings per trading store by day of week'});
+  for(let v=0;v<=yMax;v+=2000){
+    const yy=H-MB-(v/yMax)*(H-MT-MB);
+    s.appendChild(svg('line',{x1:ML,x2:W-MR,y1:yy,y2:yy,class:'gl'}));
+    const t=svg('text',{x:ML-8,y:yy+3.5,class:'axtxt','text-anchor':'end'}); t.textContent=n0(v); s.appendChild(t);
+  }
+  const bw=(W-ML-MR)/w.length;
+  w.forEach((d,i)=>{
+    const h=(d.avg/yMax)*(H-MT-MB), x0=ML+i*bw+bw*0.18, bwid=bw*0.64;
+    // A weekday where almost nothing opens is not comparable with the rest;
+    // muting it stops the eye reading Sunday as the strongest trading day.
+    const sparse=d.open_rate<50;
+    const r=svg('rect',{x:x0,y:H-MB-h,width:bwid,height:h,
+                        fill:sparse?'var(--ink-muted)':'var(--s1)',rx:3,opacity:sparse?.45:1});
+    r.addEventListener('mousemove',e=>showTip(e,d.name,
+      `${n0(d.avg)} per trading store<br>${n1(d.open_rate)}% of stores open &middot; ${n0(d.trading)} trading days`+
+      (sparse?'<br><b>Too few stores open to compare</b>':'')));
+    r.addEventListener('mouseleave',hideTip);
+    s.appendChild(r);
+    const t=svg('text',{x:x0+bwid/2,y:H-MB+15,class:'axtxt b','text-anchor':'middle'}); t.textContent=d.name; s.appendChild(t);
+    const o=svg('text',{x:x0+bwid/2,y:H-MB+29,class:'axtxt','text-anchor':'middle'});
+    o.textContent=n1(d.open_rate)+'% open'; s.appendChild(o);
+  });
+  s.appendChild(svg('line',{x1:ML,x2:W-MR,y1:H-MB,y2:H-MB,class:'base'}));
+  $('#wkchart').appendChild(s);
+})();
+(function(){
+  const w=D.weekday.slice(0,6);
+  const hi=w.reduce((a,b)=>a.avg>b.avg?a:b), lo=w.reduce((a,b)=>a.avg<b.avg?a:b);
+  $('#wktake').innerHTML=`<b>Takeaway:</b> among the six ordinary trading days, ${hi.name} is the busiest at ${n0(hi.avg)} per store and `+
+    `${lo.name} the quietest at ${n0(lo.avg)} &mdash; a ${Math.round(100*(hi.avg/lo.avg-1))}% swing that rotas and deliveries have to absorb every week. `+
+    `Sunday is excluded from that comparison: only ${n1(D.weekday[6].open_rate)}% of stores open, so its high average describes a `+
+    `self-selected handful of locations, not Sunday demand.`;
+})();
+
+/* ---------- distribution ---------- */
+(function(){
+  const b=D.dist.bins, W=560,H=190,ML=10,MR=10,MT=26,MB=30;
+  const mx=Math.max(...b), bw=(W-ML-MR)/b.length;
+  const s=svg('svg',{viewBox:`0 0 ${W} ${H}`,role:'img','aria-label':'Distribution of daily takings across trading store-days'});
+  b.forEach((v,i)=>{
+    const h=(v/mx)*(H-MT-MB);
+    const r=svg('rect',{x:ML+i*bw+1,y:H-MB-h,width:Math.max(1,bw-2),height:h,fill:'var(--s1)',rx:2});
+    const lo=Math.round(i*D.dist.max/b.length), hi=Math.round((i+1)*D.dist.max/b.length);
+    r.addEventListener('mousemove',e=>showTip(e,n0(lo)+'–'+n0(hi),`${n0(v)} store-days (${n1(100*v/D.kpi.trading_rows)}%)`));
+    r.addEventListener('mouseleave',hideTip);
+    s.appendChild(r);
+  });
+  const xv=v=>ML+(v/D.dist.max)*(W-ML-MR);
+  [['median',D.dist.median,'var(--ink)'],['90th pct',D.dist.p90,'var(--s2)']].forEach(([lab,v,col])=>{
+    s.appendChild(svg('line',{x1:xv(v),x2:xv(v),y1:MT-8,y2:H-MB,stroke:col,'stroke-width':1.5}));
+    const t=svg('text',{x:xv(v),y:MT-13,class:'axtxt b','text-anchor':'middle'});
+    t.textContent=`${lab} ${n0(v)}`; t.setAttribute('fill',col); s.appendChild(t);
+  });
+  s.appendChild(svg('line',{x1:ML,x2:W-MR,y1:H-MB,y2:H-MB,class:'base'}));
+  [0,.25,.5,.75,1].forEach(f=>{
+    const t=svg('text',{x:ML+f*(W-ML-MR),y:H-MB+15,class:'axtxt',
+      'text-anchor':f===0?'start':f===1?'end':'middle'});
+    t.textContent=f===1?n0(D.dist.max)+'+':n0(f*D.dist.max); s.appendChild(t);
+  });
+  $('#distchart').appendChild(s);
+})();
+$('#distlead').innerHTML=`Every trading store-day in the history, counted into bands of ${n0(D.dist.max/D.dist.bins.length)}.`;
+$('#disttake').innerHTML=`<b>Takeaway:</b> eight days in ten land between ${n0(D.dist.p10)} and ${n0(D.dist.p90)}, and the tail runs out to `+
+  `${n0(D.dist.hi)} &mdash; a single chain-wide average would misprice both ends, so targets and safety stock belong at store level.`;
+
+/* ---------- open / closed ---------- */
+(function(){
+  const o=D.openclosed;
+  [['Open '+n1(100*o.open/o.n)+'%','var(--s1)',o.open],['Closed '+n1(100*o.closed/o.n)+'%','var(--ink-muted)',o.closed]]
+  .forEach(([lab,c,v])=>{
+    const d=el('div',null,lab); d.style.background=c; d.style.flex=v;
+    d.addEventListener('mousemove',e=>showTip(e,lab.split(' ')[0]+' store-days',n0(v)+' of '+n0(o.n)));
+    d.addEventListener('mouseleave',hideTip);
+    $('#ocbar').appendChild(d);
+  });
+  [['Store-days with zero sales',o.zero_total],['&nbsp;&nbsp;&mdash; closed, as planned',o.zero_closed],
+   ['&nbsp;&nbsp;&mdash; open but took nothing',o.zero_open],['Closed yet recorded sales',o.closed_nonzero]]
+  .forEach(([k,v])=>{
+    const r=el('div','kv'); r.innerHTML=`<span class="k">${k}</span><span class="v2">${n0(v)}</span>`; $('#ockv').appendChild(r);
+  });
+  const mx=Math.max(...D.closed_by_dow.map(d=>d.n));
+  D.closed_by_dow.forEach(d=>{
+    const row=el('div','hb');
+    row.innerHTML=`<span class="lbl" style="min-width:34px">${d.name}</span>`+
+      `<span class="track"><span class="fill" style="width:${100*d.n/mx}%;background:var(--ink-muted)"></span></span>`+
+      `<span class="num">${n0(d.n)}</span>`;
+    $('#closeddow').appendChild(row);
+  });
+  const sunShare=Math.round(100*D.closed_by_dow[6].n/o.closed);
+  $('#octake').innerHTML=`<b>Takeaway:</b> ${sunShare}% of all closures are Sundays and only ${o.zero_open} open days took nothing at all, `+
+    `so closed days are a published trading decision rather than missing data &mdash; the plan should predict a known zero, not explain one.`;
+})();
+
+/* ---------- comparison pair renderer ---------- */
+function cmpPair(mount, yes, no, labelYes, labelNo, unitNote){
+  const mx=Math.max(yes.v,no.v), Hmax=118;
+  const box=el('div','cmp');
+  [[no,labelNo,'var(--s2)'],[yes,labelYes,'var(--s1)']].forEach(([d,lab,col])=>{
+    const c=el('div','col');
+    const bar=el('div','bar');
+    bar.style.height=Math.round(Hmax*d.v/mx)+'px'; bar.style.background=col;
+    bar.addEventListener('mousemove',e=>showTip(e,lab,`${n0(d.v)} per trading store<br>${n0(d.n)} store-days`));
+    bar.addEventListener('mouseleave',hideTip);
+    c.appendChild(bar);
+    c.appendChild(el('div','cv',n0(d.v)));
+    c.appendChild(el('div','cl',lab));
+    c.appendChild(el('div','cn',n0(d.n)+' store-days'));
+    box.appendChild(c);
+  });
+  mount.appendChild(box);
+  const up=el('div','upl',`+${n1(100*(yes.v/no.v-1))}% <small>${unitNote}</small>`);
+  mount.appendChild(up);
+}
+cmpPair($('#promochart'), {v:D.promo.yes_avg,n:D.promo.yes_n}, {v:D.promo.no_avg,n:D.promo.no_n},
+        'With promotion','No promotion','uplift per trading store');
+cmpPair($('#schoolchart'), {v:D.school.yes_avg,n:D.school.yes_n}, {v:D.school.no_avg,n:D.school.no_n},
+        'School holiday','Normal term day','uplift per trading store');
+
+$('#promotake').innerHTML=`<b>Takeaway:</b> promotions lift average takings ${n1(D.promo.uplift)}%, from ${n0(D.promo.no_avg)} to ${n0(D.promo.yes_avg)} per store, `+
+  `and they run on ${n1(D.kpi.promo_share)}% of trading days &mdash; the promo calendar is the strongest demand lever the business actually controls.`;
+$('#schooltake').innerHTML=`<b>Takeaway:</b> school holidays add only ${n1(D.school.uplift)}%, so they refine a plan at the margin rather than driving it, `+
+  `and are not worth a separate stock policy on their own.`;
+
+/* ---------- holidays ---------- */
+(function(){
+  const t=el('table');
+  t.innerHTML='<thead><tr><th>Day type</th><th class="num">Store-days</th><th class="num">Stores open</th><th class="num">Takings when open</th></tr></thead>';
+  const tb=el('tbody');
+  const normal=D.holiday[0];
+  D.holiday.forEach(h=>{
+    const vs = h.code==='0' ? '' :
+      ` <small style="color:var(--ink-muted)">(${h.avg>normal.avg?'+':''}${n1(100*(h.avg/normal.avg-1))}%)</small>`;
+    const tr=el('tr');
+    tr.innerHTML=`<td>${h.name} <span class="mono" style="color:var(--ink-muted)">${h.code}</span></td>`+
+      `<td class="num">${n0(h.n)}</td>`+
+      `<td class="num">${n1(h.open_rate)}%</td>`+
+      `<td class="num">${n0(h.avg)}${vs}</td>`;
+    tb.appendChild(tr);
+  });
+  t.appendChild(tb); $('#holtbl').appendChild(t);
+  const pub=D.holiday[1];
+  $('#holtake').innerHTML=`<b>Takeaway:</b> stores stay shut on ${n1(100-pub.open_rate)}% of public holidays, yet the few that open take `+
+    `${n1(100*(pub.avg/normal.avg-1))}% more than a normal day &mdash; holiday demand is not absent, it is concentrated into whichever stores trade.`;
+})();
+
+/* ---------- horizontal bar helper ---------- */
+function hbars(mount, items, opts){
+  const mx=Math.max(...items.map(i=>i.v));
+  items.forEach(it=>{
+    const row=el('div','hb'+(opts.mono?' mono':''));
+    row.innerHTML=`<span class="lbl" style="min-width:${opts.lblw||96}px">${it.label}${it.sub?`<small>${it.sub}</small>`:''}</span>`+
+      `<span class="track"><span class="fill" style="width:${Math.max(1,100*it.v/mx)}%;background:${opts.color||'var(--s1)'}"></span></span>`+
+      `<span class="num">${it.num}</span>`;
+    if(it.tip){
+      row.addEventListener('mousemove',e=>showTip(e,it.tipTitle||it.label,it.tip));
+      row.addEventListener('mouseleave',hideTip);
+    }
+    mount.appendChild(row);
+  });
+}
+
+hbars($('#typechart'), D.storetype.map(t=>({
+  label:t.name, sub:`${t.stores} stores · ${n1(t.share)}% of revenue`, v:t.avg, num:n0(t.avg),
+  tipTitle:t.name, tip:`${n0(t.avg)} per trading store<br>${t.stores} stores &middot; ${n1(t.share)}% of total takings`
+})), {lblw:190});
+hbars($('#asrtchart'), D.assortment.map(a=>({
+  label:a.name, sub:`${a.stores} stores · ${n1(a.share)}% of revenue`, v:a.avg, num:n0(a.avg),
+  tipTitle:a.name, tip:`${n0(a.avg)} per trading store<br>${a.stores} stores &middot; ${n1(a.share)}% of total takings`
+})), {lblw:190});
+
+(function(){
+  const b=D.storetype.reduce((a,c)=>a.avg>c.avg?a:c);
+  $('#typetake').innerHTML=`<b>Takeaway:</b> the ${b.stores} ${b.name} stores average ${n0(b.avg)} a day &mdash; `+
+    `${Math.round(100*(b.avg/D.chain.avg-1))}% above the chain &mdash; while carrying just ${n1(b.share)}% of revenue, so they are a distinct format `+
+    `to plan separately, not an outlier to smooth away.`;
+  const a=D.assortment.find(x=>x.key==='a'), c=D.assortment.find(x=>x.key==='c'), bb=D.assortment.find(x=>x.key==='b');
+  $('#asrttake').innerHTML=`<b>Takeaway:</b> assortment splits the estate into three clearly different populations &mdash; b stores take `+
+    `${Math.round(100*(bb.avg/a.avg-1))}% more per day than a stores and c stores ${Math.round(100*(c.avg/a.avg-1))}% more &mdash; so assortment is worth a `+
+    `segment in any plan, even though only ${bb.stores} stores sit in the highest-turnover group.`;
+})();
+
+/* ---------- store league tables ---------- */
+hbars($('#topchart'), D.top_stores.map(s=>({
+  label:'Store '+s.store, sub:`type ${s.type}`, v:s.avg, num:n0(s.avg),
+  tipTitle:'Store '+s.store, tip:`${n0(s.avg)} average per trading day<br>${(s.avg/D.chain.avg).toFixed(1)}× the chain average &middot; ${n0(s.days)} trading days`
+})), {lblw:132});
+hbars($('#volchart'), D.volatile.map(s=>({
+  label:'Store '+s.store, sub:`avg ${n0(s.avg)}`, v:s.cv, num:n1(s.cv)+'%',
+  tipTitle:'Store '+s.store, tip:`Day-to-day swing ${n1(s.cv)}% of its own average<br>mean ${n0(s.avg)} &middot; ${n0(s.days)} trading days`
+})), {lblw:132, color:'var(--s2)'});
+
+$('#toplead').innerHTML=`Average takings on a trading day. The chain average is ${n0(D.chain.avg)}.`;
+$('#vollead').innerHTML=`Day-to-day swing as a share of each store's own average, for stores with at least ${n0(D.chain.min_days)} trading days. `+
+  `The chain average is ${n1(D.chain.cv)}%.`;
+$('#toptake').innerHTML=`<b>Takeaway:</b> the ten busiest stores run ${(D.top_stores[9].avg/D.chain.avg).toFixed(1)}&times; to `+
+  `${(D.top_stores[0].avg/D.chain.avg).toFixed(1)}&times; the chain average, so one percentage error band applied across the estate would understate `+
+  `the money at risk in exactly the locations that carry most of it.`;
+$('#voltake').innerHTML=`<b>Takeaway:</b> the least predictable stores swing up to ${n1(D.volatile[0].cv)}% around their own average against `+
+  `${n1(D.chain.cv)}% chain-wide, and most are smaller sites &mdash; they need wider safety stock rather than a sharper single-number forecast.`;
+
+$('#foot').innerHTML=`<b>Stage 2 is descriptive &mdash; no model has been fitted and no forecast produced.</b> `+
+  `Every figure summarises history from ${D.daily.start} onward. `+
+  `Promotions, weekday, store format and assortment are all knowable in advance and are therefore candidate drivers for Stage 3; `+
+  `the split cutoff and evaluation metric remain unset, and both are still required before any model runs.`;
+</script>
